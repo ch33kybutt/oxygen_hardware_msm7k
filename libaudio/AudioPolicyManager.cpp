@@ -15,7 +15,7 @@
  */
 
 #define LOG_TAG "AudioPolicyManager"
-#define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 #include <utils/Log.h>
 #include "AudioPolicyManager.h"
 #include <media/mediarecorder.h>
@@ -140,12 +140,6 @@ uint32_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strategy, boo
 
     case STRATEGY_MEDIA: {
         uint32_t device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_AUX_DIGITAL;
-        if (device2 == 0) {
-            device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_WIRED_HEADPHONE;
-        }
-        if (device2 == 0) {
-            device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_WIRED_HEADSET;
-        }
 #ifdef WITH_A2DP
         if (mA2dpOutput != 0) {
             if (strategy == STRATEGY_SONIFICATION && !a2dpUsedForSonification()) {
@@ -162,6 +156,12 @@ uint32_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strategy, boo
             }
         }
 #endif
+        if (device2 == 0) {
+            device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_WIRED_HEADPHONE;
+        }
+        if (device2 == 0) {
+            device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_WIRED_HEADSET;
+        }
         if (device2 == 0) {
             device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_SPEAKER;
         }
