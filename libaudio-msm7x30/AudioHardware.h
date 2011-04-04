@@ -57,6 +57,26 @@ namespace android {
 #define RX_IIR_ENABLE   0x0004
 #define RX_IIR_DISABLE  0x0000
 
+#define MOD_PLAY 1
+#define MOD_REC  2
+
+#define ACDB_ID_HAC_HANDSET_MIC 107
+#define ACDB_ID_HAC_HANDSET_SPKR 207
+#define ACDB_ID_EXT_MIC_REC 307
+#define ACDB_ID_HEADSET_PLAYBACK 407
+#define ACDB_ID_HEADSET_RINGTONE_PLAYBACK 408
+#define ACDB_ID_INT_MIC_REC 507
+#define ACDB_ID_CAMCORDER   508
+#define ACDB_ID_INT_MIC_VR  509
+#define ACDB_ID_SPKR_PLAYBACK 607
+#define ACDB_ID_ALT_SPKR_PLAYBACK 609
+
+struct msm_bt_endpoint {
+    int tx;
+    int rx;
+    char name[64];
+};
+
 struct eq_filter_type {
     int16_t gain;
     uint16_t freq;
@@ -327,6 +347,13 @@ private:
     uint32_t    getInputSampleRate(uint32_t sampleRate);
     bool        checkOutputStandby();
     status_t    doRouting(AudioStreamInMSM72xx *input);
+    status_t    get_batt_temp(int *batt_temp);
+    uint32_t    getACDB(int mode, int device);
+    status_t    do_aic3254_control(int mode);
+    void        aic3254_config(const char* aic_effect);
+    int         aic3254_ioctl(int cmd, const int argc);
+    int         aic3254_powerdown();
+    int         aic3254_set_volume(int volume);
     status_t    enableFM(int sndDevice);
     status_t    disableFM();
     AudioStreamInMSM72xx*   getActiveInput_l();
@@ -444,6 +471,10 @@ private:
     };
 
             static const uint32_t inputSamplingRates[];
+            bool        mRecordState;
+            bool        mHACSetting;
+            uint32_t    mBluetoothIdTx;
+            uint32_t    mBluetoothIdRx;
             bool        mInit;
             bool        mMicMute;
             int         mFmFd;
@@ -453,9 +484,13 @@ private:
             SortedVector <AudioStreamInMSM72xx*>   mInputs;
 
             int mCurSndDevice;
+            int mNoiseSuppressionState;
             int m7xsnddriverfd;
             bool    mDualMicEnabled;
             int     mTtyMode;
+
+            msm_bt_endpoint *mBTEndpoints;
+            int mNumBTEndpoints;
 
      friend class AudioStreamInMSM72xx;
             Mutex       mLock;

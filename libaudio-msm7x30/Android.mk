@@ -1,6 +1,4 @@
-
 ifneq ($(BUILD_TINY_ANDROID),true)
-ifeq ($(strip $(QC_PROP)),true)
 
 LOCAL_PATH := $(call my-dir)
 
@@ -55,6 +53,4 @@ LOCAL_STATIC_LIBRARIES += libaudiointerface
 
 include $(BUILD_SHARED_LIBRARY)
 
-endif #QC_PROP
 endif # not BUILD_TINY_ANDROID
-
