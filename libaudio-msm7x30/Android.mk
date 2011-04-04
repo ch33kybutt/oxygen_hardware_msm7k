@@ -35,6 +35,10 @@ LOCAL_SHARED_LIBRARIES += libmedia
 LOCAL_SHARED_LIBRARIES += libhardware_legacy
 LOCAL_SHARED_LIBRARIES += libaudioalsa
 
+ifeq ($(BOARD_USE_QCOM_SPEECH),true)
+  LOCAL_CFLAGS += -DWITH_QCOM_SPEECH
+endif
+
 ifeq ($TARGET_OS)-$(TARGET_SIMULATOR),linux-true)
 LOCAL_LDLIBS += -ldl
 endif

@@ -69,22 +69,22 @@ extern "C" {
 #define DUALMIC_KEY "dualmic_enabled"
 #define TTY_MODE_KEY "tty_mode"
 
-/* No framework support
+#ifdef WITH_QCOM_SPEECH
 #define AMRNB_DEVICE_IN "/dev/msm_amrnb_in"
 #define EVRC_DEVICE_IN "/dev/msm_evrc_in"
 #define QCELP_DEVICE_IN "/dev/msm_qcelp_in"
-*/
+#endif
 
 #define AAC_DEVICE_IN "/dev/msm_aac_in"
 #define FM_DEVICE  "/dev/msm_fm"
 #define FM_A2DP_REC 1
 #define FM_FILE_REC 2
 
-/* No framework support
+#ifdef WITH_QCOM_SPEECH
 #define AMRNB_FRAME_SIZE 32
 #define EVRC_FRAME_SIZE 23
 #define QCELP_FRAME_SIZE 35
-*/
+#endif
 
 namespace android {
 
@@ -885,14 +885,14 @@ String8 AudioHardware::getParameters(const String8& keys)
         value = String8(mDualMicEnabled ? "true" : "false");
         param.add(key, value);
     }
-/* No framework support
+#ifdef WITH_QCOM_SPEECH
     key = String8("tunneled-input-formats");
     if ( param.get(key,value) == NO_ERROR ) {
         param.addInt(String8("AMR"), true );
         param.addInt(String8("QCELP"), true );
         param.addInt(String8("EVRC"), true );
     }
-*/
+#endif
     LOGV("AudioHardware::getParameters() %s", param.toString().string());
     return param.toString();
 }
@@ -915,14 +915,13 @@ static unsigned calculate_audpre_table_index(unsigned index)
 
 size_t AudioHardware::getInputBufferSize(uint32_t sampleRate, int format, int channelCount)
 {
-/* No framework support
     if ((format != AudioSystem::PCM_16_BIT) &&
+#ifdef WITH_QCOM_SPEECH
         (format != AudioSystem::AMR_NB)      &&
         (format != AudioSystem::EVRC)      &&
         (format != AudioSystem::QCELP)  &&
+#endif 
         (format != AudioSystem::AAC)){
-*/
-    if (format != AudioSystem::PCM_16_BIT) {
         LOGW("getInputBufferSize bad format: %d", format);
         return 0;
     }
@@ -931,16 +930,17 @@ size_t AudioHardware::getInputBufferSize(uint32_t sampleRate, int format, int ch
         return 0;
     }
 
-/* No framework support
+#ifdef WITH_QCOM_SPEECH
     if (format == AudioSystem::AMR_NB)
        return 320*channelCount;
-    if (format == AudioSystem::EVRC)
+    else if (format == AudioSystem::EVRC)
        return 230*channelCount;
     else if (format == AudioSystem::QCELP)
        return 350*channelCount;
     else if (format == AudioSystem::AAC)
-*/
+#else
     if (format == AudioSystem::AAC)
+#endif
        return 2048;
     else
        return 2048*channelCount;
@@ -2104,11 +2104,11 @@ status_t AudioHardware::AudioStreamInMSM72xx::set(
 {
     if ((pFormat == 0) ||
         ((*pFormat != AUDIO_HW_IN_FORMAT) &&
-/* No framework support
+#ifdef WITH_QCOM_SPEECH
          (*pFormat != AudioSystem::AMR_NB) &&
          (*pFormat != AudioSystem::EVRC) &&
          (*pFormat != AudioSystem::QCELP) &&
-*/
+#endif
          (*pFormat != AudioSystem::AAC)))
     {
         *pFormat = AUDIO_HW_IN_FORMAT;
@@ -2271,7 +2271,7 @@ status_t AudioHardware::AudioStreamInMSM72xx::set(
         mSampleRate = config.sample_rate;
         mBufferSize = config.buffer_size;
     }
-/* No framework support
+#ifdef WITH_QCOM_SPEECH
     else if (*pFormat == AudioSystem::EVRC)
     {
         LOGI("Recording format: EVRC");
@@ -2481,7 +2481,7 @@ status_t AudioHardware::AudioStreamInMSM72xx::set(
             goto  Error;
           }
     }
-*/
+#endif
     else if (*pFormat == AudioSystem::AAC)
     {
         LOGI("Recording format: AAC");
@@ -2688,7 +2688,7 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes)
             }
         }
     }
-/* No framework support
+#ifdef WITH_QCOM_SPEECH
     else if ((mFormat == AudioSystem::EVRC) || (mFormat == AudioSystem::QCELP) || (mFormat == AudioSystem::AMR_NB))
     {
         uint8_t readBuf[36];
@@ -2741,7 +2741,7 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes)
             }
         }
     }
-*/
+#endif
     else if (mFormat == AudioSystem::AAC)
     {
         *((uint32_t*)recogPtr) = 0x51434F4D ;// ('Q','C','O', 'M') Number to identify format as AAC by higher layers
@@ -2945,7 +2945,7 @@ AudioHardware::AudioStreamInMSM72xx *AudioHardware::getActiveInput_l()
 extern "C" AudioHardwareInterface* createAudioHardware(void) {
     return new AudioHardware();
 }
-
+#ifdef WITH_QCOM_SPEECH
 /*===========================================================================
 
 FUNCTION amrsup_frame_len
@@ -3258,5 +3258,6 @@ static void amr_transcode(unsigned char *src, unsigned char *dst)
 
    return;
 }
+#endif
 
 }; // namespace android
