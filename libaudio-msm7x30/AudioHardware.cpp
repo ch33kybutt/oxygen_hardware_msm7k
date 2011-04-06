@@ -64,7 +64,7 @@ extern "C" {
 #include <linux/spi_aic3254.h>
 }
 
-#define LOG_SND_RPC 0  // Set to 1 to log sound RPC's
+#define LOG_SND_RPC 1  // Set to 1 to log sound RPC's
 
 #define DUALMIC_KEY "dualmic_enabled"
 #define TTY_MODE_KEY "tty_mode"
@@ -120,25 +120,25 @@ static const uint32_t SND_DEVICE_HEADPHONE_AND_SPEAKER = 16;
 static const uint32_t SND_DEVICE_IN_S_SADC_OUT_HANDSET = 17;
 static const uint32_t SND_DEVICE_IN_S_SADC_OUT_SPEAKER_PHONE = 18;
 
-
-static uint32_t DEVICE_HANDSET_RX = 0; //handset_rx
-static uint32_t DEVICE_HANDSET_TX = 1; //handset_tx
-static uint32_t DEVICE_SPEAKER_RX = 2; //speaker_mono_rx
-static uint32_t DEVICE_SPEAKER_TX = 3; //speaker_mono_tx
-static uint32_t DEVICE_HEADSET_RX = 4; //headset_stereo_rx
-static uint32_t DEVICE_HEADSET_TX = 5; //headset_mono_tx
-static uint32_t DEVICE_FMRADIO_HANDSET_RX = 6; //fmradio_handset_rx
-static uint32_t DEVICE_FMRADIO_HEADSET_RX = 7; //fmradio_headset_rx
-static uint32_t DEVICE_FMRADIO_SPEAKER_RX = 8; //fmradio_speaker_rx
-static uint32_t DEVICE_DUALMIC_HANDSET_TX = 9; //handset_dual_mic_endfire_tx
-static uint32_t DEVICE_DUALMIC_SPEAKER_TX = 10; //speaker_dual_mic_endfire_tx
-static uint32_t DEVICE_TTY_HEADSET_MONO_RX = 11; //tty_headset_mono_rx
-static uint32_t DEVICE_TTY_HEADSET_MONO_TX = 12; //tty_headset_mono_tx
-static uint32_t DEVICE_BT_SCO_RX = 17; //bt_sco_rx
-static uint32_t DEVICE_BT_SCO_TX = 18; //bt_sco_tx
-static uint32_t DEVICE_SPEAKER_HEADSET_RX = 13; //headset_speaker_stereo_rx
-static uint32_t DEVICE_FMRADIO_STEREO_TX = 14;
-static uint32_t DEVICE_HDMI_STERO_RX = 15; //hdmi_stereo_rx
+static uint32_t DEVICE_HANDSET_RX = 0;           //handset_rx
+static uint32_t DEVICE_HANDSET_TX = 1;           //handset_tx
+static uint32_t DEVICE_HEADSET_RX = 2;           //headset_stereo_rx
+static uint32_t DEVICE_HEADSET_MONO_RX = 3;      //headset_mono_rx
+static uint32_t DEVICE_HEADSET_TX = 4;           //headset_mono_tx
+static uint32_t DEVICE_FMRADIO_HANDSET_RX = 5;   //fmradio_handset_rx
+static uint32_t DEVICE_SPEAKER_RX = 6;           //speaker_mono_rx
+static uint32_t DEVICE_FMRADIO_SPEAKER_RX = 7;   //fmradio_speaker_rx
+static uint32_t DEVICE_FMRADIO_HEADSET_RX = 8;   //fmradio_headset_rx
+static uint32_t DEVICE_TTY_HEADSET_MONO_TX = 9;  //tty_headset_mono_tx
+static uint32_t DEVICE_TTY_HEADSET_MONO_RX = 10; //tty_headset_mono_rx
+static uint32_t DEVICE_SPEAKER_TX = 11;          //speaker_mono_tx
+static uint32_t DEVICE_SPEAKER_HEADSET_RX = 12;  //headset_speaker_stereo_rx
+static uint32_t DEVICE_USB_HEADSET_RX = 13;      //usb_headset_stereo_rx
+static uint32_t DEVICE_HAC_RX = 14;              //hac_mono_rx
+static uint32_t DEVICE_ALT_RX = 15;              //alt_mono_rx
+static uint32_t DEVICE_VR_HANDSET = 16;          //handset_vr_tx
+static uint32_t DEVICE_BT_SCO_RX = 17;           //bt_sco_rx
+static uint32_t DEVICE_BT_SCO_TX = 18;           //bt_sco_tx
 static uint32_t DEVICE_COUNT = DEVICE_BT_SCO_TX +1;
 
 static bool support_aic3254 = true;
@@ -532,47 +532,67 @@ AudioHardware::AudioHardware() :
 // usb_headset_stereo_rx
 // hac_mono_rx
 
+
+static uint32_t DEVICE_HANDSET_RX = 0;           //handset_rx
+static uint32_t DEVICE_HANDSET_TX = 1;           //handset_tx
+static uint32_t DEVICE_HEADSET_RX = 2;           //headset_stereo_rx
+static uint32_t DEVICE_HEADSET_MONO_RX = 3;      //headset_mono_rx
+static uint32_t DEVICE_HEADSET_TX = 4;           //headset_mono_tx
+static uint32_t DEVICE_FMRADIO_HANDSET_RX = 5;   //fmradio_handset_rx
+static uint32_t DEVICE_SPEAKER_RX = 6;           //speaker_mono_rx
+static uint32_t DEVICE_FMRADIO_SPEAKER_RX = 7;   //fmradio_speaker_rx
+static uint32_t DEVICE_FMRADIO_HEADSET_RX = 8;   //fmradio_headset_rx
+static uint32_t DEVICE_TTY_HEADSET_MONO_TX = 9;  //tty_headset_mono_tx
+static uint32_t DEVICE_TTY_HEADSET_MONO_RX = 10; //tty_headset_mono_rx
+static uint32_t DEVICE_SPEAKER_TX = 11;          //speaker_mono_tx
+static uint32_t DEVICE_SPEAKER_HEADSET_RX = 12;  //headset_speaker_stereo_rx
+static uint32_t DEVICE_USB_HEADSET_RX = 13;      //usb_headset_stereo_rx
+static uint32_t DEVICE_HAC_RX = 14;              //hac_mono_rx
+static uint32_t DEVICE_ALT_RX = 15;              //alt_mono_rx
+static uint32_t DEVICE_VR_HANDSET = 16;          //handset_vr_tx
+static uint32_t DEVICE_BT_SCO_RX = 17;           //bt_sco_rx
+static uint32_t DEVICE_BT_SCO_TX = 18;           //bt_sco_tx
+
+
     for(i = 0; i < dev_cnt;i++) {
         if(strcmp((char* )name[i],"handset_rx") == 0)
             index = DEVICE_HANDSET_RX;
         else if(strcmp((char* )name[i],"handset_tx") == 0)
             index = DEVICE_HANDSET_TX;
-        else if(strcmp((char* )name[i],"speaker_mono_rx") == 0)
-            index = DEVICE_SPEAKER_RX;
-        else if(strcmp((char* )name[i],"speaker_mono_tx") == 0)
-            index = DEVICE_SPEAKER_TX;
         else if(strcmp((char* )name[i],"headset_stereo_rx") == 0)
             index = DEVICE_HEADSET_RX;
+        else if(strcmp((char* )name[i],"headset_mono_rx") == 0)
+            index = DEVICE_HEADSET_MONO_RX;
         else if(strcmp((char* )name[i],"headset_mono_tx") == 0)
             index = DEVICE_HEADSET_TX;
         else if(strcmp((char* )name[i],"fmradio_handset_rx") == 0)
             index = DEVICE_FMRADIO_HANDSET_RX;
-        else if(strcmp((char* )name[i],"fmradio_headset_rx") == 0)
-            index = DEVICE_FMRADIO_HEADSET_RX;
+        else if(strcmp((char* )name[i],"speaker_mono_rx") == 0)
+            index = DEVICE_SPEAKER_RX;
         else if(strcmp((char* )name[i],"fmradio_speaker_rx") == 0)
             index = DEVICE_FMRADIO_SPEAKER_RX;
-
-/* This should be needed ?
-        else if(strcmp((char* )name[i],"handset_dual_mic_endfire_tx") == 0)
-            index = DEVICE_DUALMIC_HANDSET_TX;
-        else if(strcmp((char* )name[i],"speaker_dual_mic_endfire_tx") == 0)
-            index = DEVICE_DUALMIC_SPEAKER_TX;
-*/
-
-        else if(strcmp((char* )name[i],"tty_headset_mono_rx") == 0)
-            index = DEVICE_TTY_HEADSET_MONO_RX;
+        else if(strcmp((char* )name[i],"fmradio_headset_rx") == 0)
+            index = DEVICE_FMRADIO_HEADSET_RX;
         else if(strcmp((char* )name[i],"tty_headset_mono_tx") == 0)
             index = DEVICE_TTY_HEADSET_MONO_TX;
+        else if(strcmp((char* )name[i],"tty_headset_mono_rx") == 0)
+            index = DEVICE_TTY_HEADSET_MONO_RX;
+        else if(strcmp((char* )name[i],"speaker_mono_tx") == 0)
+            index = DEVICE_SPEAKER_TX;
+        else if(strcmp((char*)name[i],"headset_speaker_stereo_rx") == 0)
+            index = DEVICE_SPEAKER_HEADSET_RX;
+        else if(strcmp((char*)name[i],"usb_headset_stereo_rx") == 0)
+            index = DEVICE_USB_HEADSET_RX;
+        else if(strcmp((char*)name[i],"hac_mono_rx") == 0)
+            index = DEVICE_HAC_RX;
+        else if(strcmp((char*)name[i],"alt_mono_rx") == 0)
+            index = DEVICE_ALT_RX;
+        else if(strcmp((char*)name[i],"handset_vr_tx") == 0)
+            index = DEVICE_VR_HANDSET;
         else if(strcmp((char* )name[i],"bt_sco_rx") == 0)
             index = DEVICE_BT_SCO_RX;
         else if(strcmp((char* )name[i],"bt_sco_tx") == 0)
             index = DEVICE_BT_SCO_TX;
-        else if(strcmp((char*)name[i],"headset_speaker_stereo_rx") == 0)
-            index = DEVICE_SPEAKER_HEADSET_RX;
-        else if(strcmp((char*)name[i],"fmradio_stereo_tx") == 0)
-            index = DEVICE_FMRADIO_STEREO_TX;
-        else if(strcmp((char*)name[i],"hdmi_stereo_rx") == 0)
-            index = DEVICE_HDMI_STERO_RX;
         else
             continue;
         LOGV("index = %d",index);
@@ -1058,6 +1078,7 @@ static status_t do_route_audio_rpc(uint32_t device,
         fm_device = DEVICE_FMRADIO_HEADSET_RX;
         LOGV("In FM HEADSET");
     }
+/*
     else if(device == SND_DEVICE_IN_S_SADC_OUT_HANDSET) {
         new_rx_device = DEVICE_HANDSET_RX;
         new_tx_device = DEVICE_DUALMIC_HANDSET_TX;
@@ -1068,6 +1089,7 @@ static status_t do_route_audio_rpc(uint32_t device,
         new_tx_device = DEVICE_DUALMIC_SPEAKER_TX;
         LOGV("In DUALMIC_SPEAKER");
     }
+*/
     else if(device == SND_DEVICE_TTY_FULL) {
         new_rx_device = DEVICE_TTY_HEADSET_MONO_RX;
         new_tx_device = DEVICE_TTY_HEADSET_MONO_TX;
@@ -1580,6 +1602,7 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input)
 status_t AudioHardware::enableFM(int sndDevice)
 {
     LOGD("enableFM");
+/*
     status_t status = NO_INIT;
     unsigned short session_id = INVALID_DEVICE;
     status = ::open(FM_DEVICE, O_RDWR);
@@ -1617,12 +1640,14 @@ status_t AudioHardware::enableFM(int sndDevice)
         ::close(mFmFd);
         mFmFd = -1;
     }
+*/
     return NO_ERROR;
 }
 
 status_t AudioHardware::disableFM()
 {
     LOGD("disableFM");
+/*
     Routing_table* temp = NULL;
     temp = getNodeByStreamType(FM_RADIO);
     if(temp == NULL)
@@ -1642,6 +1667,7 @@ status_t AudioHardware::disableFM()
     }
     deleteFromTable(FM_RADIO);
     updateDeviceInfo(cur_rx, cur_tx);
+*/
     return NO_ERROR;
 }
 
@@ -2601,6 +2627,7 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes)
             return -1;
         }
         if((mDevices == AudioSystem::DEVICE_IN_FM_RX) || (mDevices == AudioSystem::DEVICE_IN_FM_RX_A2DP) ){
+/*
             if(ioctl(mFd, AUDIO_GET_SESSION_ID, &dec_id)) {
                 LOGE("AUDIO_GET_SESSION_ID failed*********");
                 hw->mLock.unlock();
@@ -2628,6 +2655,7 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes)
                 mFmRec = FM_FILE_REC;
             }
             hw->mLock.unlock();
+*/
         }
         else{
             hw->mLock.unlock();
@@ -2653,7 +2681,6 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes)
             mFirstread = false;
         }
     }
-
 
     if (mState < AUDIO_INPUT_STARTED) {
         // force routing to input device
@@ -2815,6 +2842,8 @@ status_t AudioHardware::AudioStreamInMSM72xx::standby()
         //mHardware->checkMicMute();
         mState = AUDIO_INPUT_CLOSED;
     }
+
+/*
     if (mFmRec == FM_A2DP_REC) {
         //A2DP Recording
         temp = getNodeByStreamType(FM_A2DP);
@@ -2840,6 +2869,7 @@ status_t AudioHardware::AudioStreamInMSM72xx::standby()
         }
         deleteFromTable(FM_REC);
     }
+*/
     temp = getNodeByStreamType(PCM_REC);
     if(temp == NULL)
         return NO_ERROR;
