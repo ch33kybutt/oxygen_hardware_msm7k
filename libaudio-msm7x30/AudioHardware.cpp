@@ -99,26 +99,26 @@ static const uint32_t INVALID_DEVICE = 65535;
 static const uint32_t SND_DEVICE_CURRENT = -1;
 static const uint32_t SND_DEVICE_HANDSET = 0;
 static const uint32_t SND_DEVICE_SPEAKER = 1;
+static const uint32_t SND_DEVICE_HEADSET = 2;
 static const uint32_t SND_DEVICE_BT = 3;
 static const uint32_t SND_DEVICE_CARKIT = 4;
-static const uint32_t SND_DEVICE_BT_EC_OFF = 45;
-static const uint32_t SND_DEVICE_HEADSET = 2;
-static const uint32_t SND_DEVICE_HEADSET_AND_SPEAKER = 10;
-static const uint32_t SND_DEVICE_FM_HEADSET = 9;
-static const uint32_t SND_DEVICE_FM_SPEAKER = 11;
-static const uint32_t SND_DEVICE_FM_HANDSET = 12;
-static const uint32_t SND_DEVICE_NO_MIC_HEADSET = 8;
 static const uint32_t SND_DEVICE_TTY_FULL = 5;
 static const uint32_t SND_DEVICE_TTY_VCO = 6;
 static const uint32_t SND_DEVICE_TTY_HCO = 7;
+static const uint32_t SND_DEVICE_NO_MIC_HEADSET = 8;
+static const uint32_t SND_DEVICE_FM_HEADSET = 9;
+static const uint32_t SND_DEVICE_HEADSET_AND_SPEAKER = 10;
+static const uint32_t SND_DEVICE_FM_SPEAKER = 11;
+static const uint32_t SND_DEVICE_FM_HANDSET = 12;
+static const uint32_t SND_DEVICE_HEADPHONE_AND_SPEAKER = 16;
+static const uint32_t SND_DEVICE_IN_S_SADC_OUT_HANDSET = 17;
+static const uint32_t SND_DEVICE_IN_S_SADC_OUT_SPEAKER_PHONE = 18;
 static const uint32_t SND_DEVICE_HANDSET_BACK_MIC = 20;
 static const uint32_t SND_DEVICE_SPEAKER_BACK_MIC = 21;
 static const uint32_t SND_DEVICE_NO_MIC_HEADSET_BACK_MIC = 28;
 static const uint32_t SND_DEVICE_HEADSET_AND_SPEAKER_BACK_MIC = 30;
 static const uint32_t SND_DEVICE_I2S_SPEAKER = 32;
-static const uint32_t SND_DEVICE_HEADPHONE_AND_SPEAKER = 16;
-static const uint32_t SND_DEVICE_IN_S_SADC_OUT_HANDSET = 17;
-static const uint32_t SND_DEVICE_IN_S_SADC_OUT_SPEAKER_PHONE = 18;
+static const uint32_t SND_DEVICE_BT_EC_OFF = 45;
 
 static uint32_t DEVICE_HANDSET_RX = 0;           //handset_rx
 static uint32_t DEVICE_HANDSET_TX = 1;           //handset_tx
@@ -527,33 +527,6 @@ AudioHardware::AudioHardware() :
     for(i = 0;i<dev_cnt;i++)
         device_list[i].dev_id = INVALID_DEVICE;
 
-// Missing
-// headset_mono_rx
-// usb_headset_stereo_rx
-// hac_mono_rx
-
-
-static uint32_t DEVICE_HANDSET_RX = 0;           //handset_rx
-static uint32_t DEVICE_HANDSET_TX = 1;           //handset_tx
-static uint32_t DEVICE_HEADSET_RX = 2;           //headset_stereo_rx
-static uint32_t DEVICE_HEADSET_MONO_RX = 3;      //headset_mono_rx
-static uint32_t DEVICE_HEADSET_TX = 4;           //headset_mono_tx
-static uint32_t DEVICE_FMRADIO_HANDSET_RX = 5;   //fmradio_handset_rx
-static uint32_t DEVICE_SPEAKER_RX = 6;           //speaker_mono_rx
-static uint32_t DEVICE_FMRADIO_SPEAKER_RX = 7;   //fmradio_speaker_rx
-static uint32_t DEVICE_FMRADIO_HEADSET_RX = 8;   //fmradio_headset_rx
-static uint32_t DEVICE_TTY_HEADSET_MONO_TX = 9;  //tty_headset_mono_tx
-static uint32_t DEVICE_TTY_HEADSET_MONO_RX = 10; //tty_headset_mono_rx
-static uint32_t DEVICE_SPEAKER_TX = 11;          //speaker_mono_tx
-static uint32_t DEVICE_SPEAKER_HEADSET_RX = 12;  //headset_speaker_stereo_rx
-static uint32_t DEVICE_USB_HEADSET_RX = 13;      //usb_headset_stereo_rx
-static uint32_t DEVICE_HAC_RX = 14;              //hac_mono_rx
-static uint32_t DEVICE_ALT_RX = 15;              //alt_mono_rx
-static uint32_t DEVICE_VR_HANDSET = 16;          //handset_vr_tx
-static uint32_t DEVICE_BT_SCO_RX = 17;           //bt_sco_rx
-static uint32_t DEVICE_BT_SCO_TX = 18;           //bt_sco_tx
-
-
     for(i = 0; i < dev_cnt;i++) {
         if(strcmp((char* )name[i],"handset_rx") == 0)
             index = DEVICE_HANDSET_RX;
@@ -627,11 +600,6 @@ static uint32_t DEVICE_BT_SCO_TX = 18;           //bt_sco_tx
     if (rc < 0) {
         LOGD("Could not set aic3254 parameters to share memory: %d", rc);
         support_aic3254 = false;
-    }
-
-/* Force to Original until we get better idea on the DSP profile settings */
-    if (support_aic3254) {
-        aic3254_config("Original");
     }
 
     snd_get_num = (int (*)(void))::dlsym(acoustic, "snd_get_num");
@@ -1370,9 +1338,14 @@ uint32_t AudioHardware::getACDB(int mode, int device)
 
 status_t AudioHardware::do_aic3254_control(int mode)
 {
-// This function must set bot RX and TX mode
+// This function must be rewritten
+// and should set bot RX and TX
 
     LOGD("do_aic3254_control mode: %d ", mode);
+
+    // Default OFF
+    int new_txmode = UPLINK_OFF;
+    int new_rxmode = DOWNLINK_OFF;
 
     if (cur_rx == SND_DEVICE_SPEAKER ||
         cur_rx == SND_DEVICE_HEADSET ||
@@ -1415,10 +1388,10 @@ void AudioHardware::aic3254_config(const char* aic_effect)
         LOGE("Could not set sound effect Original: %d", rc);
     }
 
-// TEST
+// TEST set volume to 30 (0-40) and power on dsp tx/rx
     aic3254_set_volume(30);
-    aic3254_ioctl(AIC3254_CONFIG_RX, 13);
-    aic3254_ioctl(AIC3254_CONFIG_TX, 13);
+    aic3254_ioctl(AIC3254_CONFIG_RX, PLAYBACK_SPEAKER);
+    aic3254_ioctl(AIC3254_CONFIG_TX, VOICERECORD_IMIC);
 // END TEST
 }
 
