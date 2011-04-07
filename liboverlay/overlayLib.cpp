@@ -81,35 +81,37 @@ static int get_size(int format, int w, int h) {
 }
 
 static int get_mdp_orientation(int rotation, int flip) {
-    switch(flip) {
-    case HAL_TRANSFORM_FLIP_V:
-        switch(rotation) {
-        case 0: return MDP_FLIP_UD;
-        case HAL_TRANSFORM_ROT_90:  return (MDP_ROT_90 | MDP_FLIP_UD);
+    int mdp_orientation = 0;
+
+    switch (rotation) {
+        case 0:
+            break;
+        case 90: mdp_orientation ^= MDP_ROT_90;
+            break;
+        case 180: mdp_orientation ^= MDP_ROT_180;
+            flip ^= (HAL_TRANSFORM_FLIP_H|HAL_TRANSFORM_FLIP_V);
+            break;
+        case 270: mdp_orientation ^= MDP_ROT_270;
+            flip ^= (HAL_TRANSFORM_FLIP_H|HAL_TRANSFORM_FLIP_V);
+            break;
         default: return -1;
-        break;
-        }
-    break;
-    case HAL_TRANSFORM_FLIP_H:
-        switch(rotation) {
-        case 0: return MDP_FLIP_LR;
-        case HAL_TRANSFORM_ROT_90:  return (MDP_ROT_90 | MDP_FLIP_LR);
-        default: return -1;
-        break;
-        }
-    break;
-    default:
-        switch(rotation) {
-        case 0: return MDP_ROT_NOP;
-        case HAL_TRANSFORM_ROT_90:  return MDP_ROT_90;
-        case HAL_TRANSFORM_ROT_180: return MDP_ROT_180;
-        case HAL_TRANSFORM_ROT_270: return MDP_ROT_270;
-        default: return -1;
-        break;
-        }
-    break;
     }
-    return -1;
+
+    if (flip & ~(HAL_TRANSFORM_FLIP_H|HAL_TRANSFORM_FLIP_V))
+        return -1;
+
+    /* The MDP flips after rotating instead of before, so swap it if
+       we're rotating */
+    if (flip & HAL_TRANSFORM_FLIP_H) {
+        mdp_orientation ^= (mdp_orientation & MDP_ROT_90)
+            ? MDP_FLIP_UD : MDP_FLIP_LR;
+    }
+    if (flip & HAL_TRANSFORM_FLIP_V) {
+        mdp_orientation ^= (mdp_orientation & MDP_ROT_90)
+            ? MDP_FLIP_LR : MDP_FLIP_UD;
+    }
+
+    return mdp_orientation;
 }
 
 static bool isRGBType(int format) {
@@ -860,122 +862,59 @@ bool OverlayControlChannel::setParameter(int param, int value, bool fetch) {
     switch (param) {
     case OVERLAY_DITHER:
         break;
+    case OVERLAY_ROTATION_DEG:
+    {
+        switch (value) {
+        case 0: value = 0; break;
+        case 90: value = HAL_TRANSFORM_ROT_90; break;
+        case 180: value = HAL_TRANSFORM_ROT_180; break;
+        case 270: value = HAL_TRANSFORM_ROT_270; break;
+        default: return false;
+        }
+        /* Fallthrough */
+    }
     case OVERLAY_TRANSFORM:
     {
         int val = mOVInfo.user_data[0];
         if (value && mNoRot)
             return true;
 
-        int rot = value;
-        int flip = 0;
+        int rot = (value & HAL_TRANSFORM_ROT_90) ? 90 : 0;
+        int flip = (value & (HAL_TRANSFORM_FLIP_H|HAL_TRANSFORM_FLIP_V));
 
-        switch(rot) {
-        case 0:
-        case HAL_TRANSFORM_FLIP_H:
-        case HAL_TRANSFORM_FLIP_V:
-        {
-            if (val == MDP_ROT_90) {
-                    int tmp = mOVInfo.src_rect.y;
-                    mOVInfo.src_rect.y = mOVInfo.src.width -
-                            (mOVInfo.src_rect.x + mOVInfo.src_rect.w);
-                    mOVInfo.src_rect.x = tmp;
-                    swapOVRotWidthHeight();
-            }
-            else if (val == MDP_ROT_270) {
-                    int tmp = mOVInfo.src_rect.x;
-                    mOVInfo.src_rect.x = mOVInfo.src.height - (
-                            mOVInfo.src_rect.y + mOVInfo.src_rect.h);
-                    mOVInfo.src_rect.y = tmp;
-                    swapOVRotWidthHeight();
-            }
-            rot = 0;
-            flip = value & (HAL_TRANSFORM_FLIP_H|HAL_TRANSFORM_FLIP_V);
-            break;
+        if (!rot != !(val & MDP_ROT_90)) {
+            int tmp = mOVInfo.src_rect.y;
+            mOVInfo.src_rect.y = mOVInfo.src.width -
+                    (mOVInfo.src_rect.x + mOVInfo.src_rect.w);
+            mOVInfo.src_rect.x = tmp;
+            swapOVRotWidthHeight();
         }
-        case HAL_TRANSFORM_ROT_90:
-        case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_H):
-        case (HAL_TRANSFORM_ROT_90|HAL_TRANSFORM_FLIP_V):
-        {
-            if (val == MDP_ROT_270) {
-                    mOVInfo.src_rect.x = mOVInfo.src.width - (
-                            mOVInfo.src_rect.x + mOVInfo.src_rect.w);
-                    mOVInfo.src_rect.y = mOVInfo.src.height - (
-                    mOVInfo.src_rect.y + mOVInfo.src_rect.h);
-            }
-            else if (val == MDP_ROT_NOP || val == MDP_ROT_180) {
-                    int tmp = mOVInfo.src_rect.x;
-                    mOVInfo.src_rect.x = mOVInfo.src.height -
-                               (mOVInfo.src_rect.y + mOVInfo.src_rect.h);
-                    mOVInfo.src_rect.y = tmp;
-                    swapOVRotWidthHeight();
-            }
-            rot = HAL_TRANSFORM_ROT_90;
-            flip = value & (HAL_TRANSFORM_FLIP_H|HAL_TRANSFORM_FLIP_V);
-            break;
-        }
-        case HAL_TRANSFORM_ROT_180:
-        {
-            if (val == MDP_ROT_270) {
-                    int tmp = mOVInfo.src_rect.y;
-                    mOVInfo.src_rect.y = mOVInfo.src.width -
-                               (mOVInfo.src_rect.x + mOVInfo.src_rect.w);
-                    mOVInfo.src_rect.x = tmp;
-                    swapOVRotWidthHeight();
-            }
-            else if (val == MDP_ROT_90) {
-                    int tmp = mOVInfo.src_rect.x;
-                    mOVInfo.src_rect.x = mOVInfo.src.height - (
-                             mOVInfo.src_rect.y + mOVInfo.src_rect.h);
-                    mOVInfo.src_rect.y = tmp;
-                    swapOVRotWidthHeight();
-            }
-            break;
-        }
-        case HAL_TRANSFORM_ROT_270:
-        {
-            if (val == MDP_ROT_90) {
-                    mOVInfo.src_rect.y = mOVInfo.src.height -
-                               (mOVInfo.src_rect.y + mOVInfo.src_rect.h);
-                    mOVInfo.src_rect.x = mOVInfo.src.width -
-                               (mOVInfo.src_rect.x + mOVInfo.src_rect.w);
-            }
-            else if (val == MDP_ROT_NOP || val == MDP_ROT_180) {
-                    int tmp = mOVInfo.src_rect.y;
-                    mOVInfo.src_rect.y = mOVInfo.src.width - (
-                        mOVInfo.src_rect.x + mOVInfo.src_rect.w);
-                    mOVInfo.src_rect.x = tmp;
-                    swapOVRotWidthHeight();
-            }
-            break;
-        }
-        default: return false;
-    }
-    int mdp_rotation = get_mdp_orientation(rot, flip);
-    if (mdp_rotation == -1)
-        return false;
 
-    mOVInfo.user_data[0] = mdp_rotation;
-    mRotInfo.rotations = mOVInfo.user_data[0];
-
-    if (mOVInfo.user_data[0])
-        mRotInfo.enable = 1;
-    else {
-        if(mRotInfo.src.format == MDP_Y_CRCB_H2V2_TILE)
-            mOVInfo.src.format = MDP_Y_CRCB_H2V2_TILE;
-        if(mFBPanelType == MDDI_PANEL)
-            mRotInfo.enable = 1;
-        else
-            mRotInfo.enable = 0;
-        }
-        if (ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &mRotInfo)) {
-            reportError("setParameter, rotator start failed");
+        int mdp_rotation = get_mdp_orientation(rot, flip);
+        if (mdp_rotation == -1)
             return false;
-        }
 
-    if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
-        reportError("setParameter, overlay set failed");
-        return false;
-    }
+        if (mOVInfo.user_data[0] != mdp_rotation) {
+            mOVInfo.user_data[0] = mdp_rotation;
+            mRotInfo.rotations = mOVInfo.user_data[0];
+
+            mRotInfo.enable = mRotInfo.rotations ? 1 : 0;
+            if (mFBPanelType != MDDI_PANEL)
+                mRotInfo.enable = 0;
+
+            if (mRotInfo.src.format == MDP_Y_CRCB_H2V2_TILE)
+                mOVInfo.src.format = MDP_Y_CRCB_H2V2_TILE;
+
+            if (ioctl(mRotFD, MSM_ROTATOR_IOCTL_START, &mRotInfo)) {
+                reportError("setParameter, rotator start failed");
+                return false;
+            }
+
+            if (ioctl(mFD, MSMFB_OVERLAY_SET, &mOVInfo)) {
+                reportError("setParameter, overlay set failed");
+                return false;
+            }
+        }
         break;
     }
     default:
