@@ -26,10 +26,12 @@
 #include <hardware_legacy/AudioHardwareBase.h>
 
 extern "C" {
-#include <linux/msm_audio.h>
-#include <linux/msm_audio_qcp.h>
+#include <linux/msm_audio_7X30.h>
 #include <linux/msm_audio_aac.h>
+#ifdef WITH_QCOM_SPEECH
+#include <linux/msm_audio_qcp.h>
 #include <linux/msm_audio_amrnb.h>
+#endif
 }
 
 namespace android {
@@ -108,6 +110,24 @@ struct msm_audio_stats {
     uint32_t unused[3];
 };
 
+enum tty_modes {
+    TTY_OFF = 0,
+    TTY_VCO = 1,
+    TTY_HCO = 2,
+    TTY_FULL = 3
+};
+
+#define CODEC_TYPE_PCM 0
+#define AUDIO_HW_NUM_OUT_BUF 2  // Number of buffers in audio driver for output
+// TODO: determine actual audio DSP and hardware latency
+#define AUDIO_HW_OUT_LATENCY_MS 0  // Additionnal latency introduced by audio DSP and hardware in ms
+
+#define AUDIO_HW_IN_SAMPLERATE 8000                 // Default audio input sample rate
+#define AUDIO_HW_IN_CHANNELS (AudioSystem::CHANNEL_IN_MONO) // Default audio input channel mask
+#define AUDIO_HW_IN_BUFFERSIZE 2048                 // Default audio input buffer size
+#define AUDIO_HW_IN_FORMAT (AudioSystem::PCM_16_BIT)  // Default audio input sample format
+
+#ifdef WITH_QCOM_SPEECH
 /* AMR frame type definitions */
 typedef enum {
   AMRSUP_SPEECH_GOOD,          /* Good speech frame              */
@@ -215,22 +235,6 @@ typedef struct {
   unsigned short *class_c;
 } amrsup_frame_order_type;
 
-enum tty_modes {
-    TTY_OFF = 0,
-    TTY_VCO = 1,
-    TTY_HCO = 2,
-    TTY_FULL = 3
-};
-
-#define CODEC_TYPE_PCM 0
-#define AUDIO_HW_NUM_OUT_BUF 2  // Number of buffers in audio driver for output
-// TODO: determine actual audio DSP and hardware latency
-#define AUDIO_HW_OUT_LATENCY_MS 0  // Additionnal latency introduced by audio DSP and hardware in ms
-
-#define AUDIO_HW_IN_SAMPLERATE 8000                 // Default audio input sample rate
-#define AUDIO_HW_IN_CHANNELS (AudioSystem::CHANNEL_IN_MONO) // Default audio input channel mask
-#define AUDIO_HW_IN_BUFFERSIZE 2048                 // Default audio input buffer size
-#define AUDIO_HW_IN_FORMAT (AudioSystem::PCM_16_BIT)  // Default audio input sample format
 /* ======================== 12.2 kbps mode ========================== */
 const unsigned short amrsup_bit_order_122_a[AMR_CLASS_A_BITS_122] = {
      0,   1,   2,   3,   4,   5,   6,   7,   8,   9,
@@ -278,6 +282,7 @@ const amrsup_frame_order_type amrsup_122_framing = {
   AMR_CLASS_C_BITS_122,
   (unsigned short *) amrsup_bit_order_122_c
 };
+#endif
 
 // ----------------------------------------------------------------------------
 
