@@ -778,6 +778,18 @@ bool OverlayControlChannel::setPosition(int x, int y, uint32_t w, uint32_t h) {
         return false;
     }
 
+    /* HACK: Restore previous source size if it was changed due to
+       the minification limit. */
+    /* This may produce incorrect values when using tiled formats. */
+    if (ov.src_rect.w < ov.src.width) {
+        ov.src_rect.w = ov.src.width;
+        ov.src_rect.x = 0;
+    }
+    if (ov.src_rect.h < ov.src.height) {
+        ov.src_rect.h = ov.src.height;
+        ov.src_rect.y = 0;
+    }
+
     /* Scaling of upto a max of 8 times supported */
     if(w >(ov.src_rect.w * HW_OVERLAY_MAGNIFICATION_LIMIT)){
         w = HW_OVERLAY_MAGNIFICATION_LIMIT * ov.src_rect.w;
@@ -791,6 +803,16 @@ bool OverlayControlChannel::setPosition(int x, int y, uint32_t w, uint32_t h) {
     ov.dst_rect.y = y;
     ov.dst_rect.w = w;
     ov.dst_rect.h = h;
+
+    /* Crop if the scale down is below the supported minification amount */
+    if (ov.src_rect.w > (w * HW_OVERLAY_MINIFICATION_LIMIT)) {
+        ov.src_rect.w = w * HW_OVERLAY_MINIFICATION_LIMIT;
+        ov.src_rect.x = (ov.src.width - ov.src_rect.w) / 2;
+    }
+    if (ov.src_rect.h > (h * HW_OVERLAY_MINIFICATION_LIMIT)) {
+        ov.src_rect.h = h * HW_OVERLAY_MINIFICATION_LIMIT;
+        ov.src_rect.y = (ov.src.height - ov.src_rect.h) / 2;
+    }
 
     if (ioctl(mFD, MSMFB_OVERLAY_SET, &ov)) {
         reportError("setPosition, Overlay SET failed");
@@ -1223,6 +1245,17 @@ bool OverlayDataChannel::setCrop(uint32_t x, uint32_t y, uint32_t w, uint32_t h)
     if(ov.dst_rect.h >(ov.src_rect.h * HW_OVERLAY_MAGNIFICATION_LIMIT)) {
         ov.dst_rect.h = HW_OVERLAY_MAGNIFICATION_LIMIT * ov.src_rect.h;
     }
+
+    /* Crop if the scale down is below the supported minification amount */
+    if (ov.src_rect.w > (ov.dst_rect.w * HW_OVERLAY_MINIFICATION_LIMIT)) {
+        ov.src_rect.w = ov.dst_rect.w * HW_OVERLAY_MINIFICATION_LIMIT;
+        ov.src_rect.x = (ov.src.width - ov.src_rect.w) / 2;
+    }
+    if (ov.src_rect.h > (ov.dst_rect.h * HW_OVERLAY_MINIFICATION_LIMIT)) {
+        ov.src_rect.h = ov.dst_rect.h * HW_OVERLAY_MINIFICATION_LIMIT;
+        ov.src_rect.y = (ov.src.height - ov.src_rect.h) / 2;
+    }
+
     if (ioctl(mFD, MSMFB_OVERLAY_SET, &ov)) {
         reportError("setCrop, overlay set error");
         return false;

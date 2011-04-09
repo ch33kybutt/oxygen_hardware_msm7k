@@ -42,7 +42,9 @@
 #include <hardware/overlay.h>
 
 #define HW_OVERLAY_MAGNIFICATION_LIMIT 8
+#ifndef HW_OVERLAY_MINIFICATION_LIMIT
 #define HW_OVERLAY_MINIFICATION_LIMIT HW_OVERLAY_MAGNIFICATION_LIMIT
+#endif
 
 #define EVEN_OUT(x) if (x & 0x0001) {x--;}
 #define VG0_PIPE 0
