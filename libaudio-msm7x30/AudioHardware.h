@@ -40,16 +40,6 @@ namespace android {
 // Kernel driver interface
 //
 
-#define SAMP_RATE_INDX_8000	0
-#define SAMP_RATE_INDX_11025	1
-#define SAMP_RATE_INDX_12000	2
-#define SAMP_RATE_INDX_16000	3
-#define SAMP_RATE_INDX_22050	4
-#define SAMP_RATE_INDX_24000	5
-#define SAMP_RATE_INDX_32000	6
-#define SAMP_RATE_INDX_44100	7
-#define SAMP_RATE_INDX_48000	8
-
 #define EQ_MAX_BAND_NUM 12
 
 #define ADRC_ENABLE  0x0001
@@ -71,7 +61,7 @@ namespace android {
 #define ACDB_ID_CAMCORDER   508
 #define ACDB_ID_INT_MIC_VR  509
 #define ACDB_ID_SPKR_PLAYBACK 607
-#define ACDB_ID_ALT_SPKR_PLAYBACK 609
+#define ACDB_ID_ALT_SPKR_PLAYBACK 608
 
 struct msm_bt_endpoint {
     int tx;
@@ -126,6 +116,8 @@ enum tty_modes {
 #define AUDIO_HW_IN_CHANNELS (AudioSystem::CHANNEL_IN_MONO) // Default audio input channel mask
 #define AUDIO_HW_IN_BUFFERSIZE 2048                 // Default audio input buffer size
 #define AUDIO_HW_IN_FORMAT (AudioSystem::PCM_16_BIT)  // Default audio input sample format
+
+#define VOICE_VOLUME_MAX 5  // Maximum voice volume
 
 #ifdef WITH_QCOM_SPEECH
 /* AMR frame type definitions */
@@ -351,11 +343,15 @@ private:
     status_t    dumpInternals(int fd, const Vector<String16>& args);
     uint32_t    getInputSampleRate(uint32_t sampleRate);
     bool        checkOutputStandby();
+    status_t    get_mMode();
+    status_t    set_mRecordState(bool onoff);
+    status_t    get_mRecordState();
+    status_t    get_snd_dev();
     status_t    doRouting(AudioStreamInMSM72xx *input);
     status_t    get_batt_temp(int *batt_temp);
     uint32_t    getACDB(int mode, int device);
-    status_t    do_aic3254_control(int mode);
-    void        aic3254_config(const char* aic_effect);
+    status_t    do_aic3254_control(int mode, bool Record, bool Standby, uint32_t Routes);
+    void        aic3254_config(uint32_t Routes, const char* aic_effect);
     int         aic3254_ioctl(int cmd, const int argc);
     int         aic3254_powerdown();
     int         aic3254_set_volume(int volume);
@@ -493,6 +489,7 @@ private:
             int m7xsnddriverfd;
             bool    mDualMicEnabled;
             int     mTtyMode;
+            uint32_t mVoiceVolume;
 
             msm_bt_endpoint *mBTEndpoints;
             int mNumBTEndpoints;

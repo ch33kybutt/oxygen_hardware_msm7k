@@ -24,6 +24,8 @@
 
 namespace android {
 
+
+
 // ----------------------------------------------------------------------------
 // AudioPolicyManager for msm7x30 platform
 // ----------------------------------------------------------------------------
@@ -103,6 +105,10 @@ uint32_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strategy, boo
         }
         if (mAvailableOutputDevices & AudioSystem::DEVICE_OUT_FM) {
             device |= AudioSystem::DEVICE_OUT_FM;
+            if (mForceUse[AudioSystem::FOR_MEDIA] == AudioSystem::FORCE_SPEAKER) {
+                device &= ~(AudioSystem::DEVICE_OUT_WIRED_HEADSET);
+                device |= AudioSystem::DEVICE_OUT_SPEAKER;
+            }
         }
     break;
 

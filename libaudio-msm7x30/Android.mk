@@ -52,7 +52,6 @@ endif
 LOCAL_C_INCLUDES += $(TARGET_OUT_HEADERS)/mm-audio/audio-alsa
 LOCAL_SRC_FILES += AudioHardware.cpp
 LOCAL_CFLAGS += -fno-short-enums
-LOCAL_CFLAGS += -DQC_PROP
 LOCAL_STATIC_LIBRARIES += libaudiointerface
 
 include $(BUILD_SHARED_LIBRARY)

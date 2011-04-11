@@ -30,29 +30,8 @@
 #include <sys/stat.h>
 #include <dlfcn.h>
 #include <fcntl.h>
-#include <control.h>
-#if defined(QC_PROP)
+
 #include "control.h"
-#else
-    #define msm_mixer_count() (-EPERM)
-    #define msm_mixer_open(name, card) (-EPERM)
-    #define msm_mixer_close() (-EPERM)
-    #define msm_get_device(name) (-EPERM)
-    #define msm_en_device(dev_id, set) (-EPERM)
-    #define msm_route_stream(dir, dec_id, dev_id, set) (-EPERM)
-    #define msm_route_voice(tx, rx, set) (-EPERM)
-    #define msm_set_volume(dec_id, vol) (-EPERM)
-    #define msm_get_device_class(device_id) (-EPERM)
-    #define msm_get_device_capability(device_id) (-EPERM)
-    #define msm_get_device_list() (-EPERM)
-    #define msm_get_device_count() (-EPERM)
-    #define msm_start_voice() (-EPERM)
-    #define msm_end_voice() (-EPERM)
-    #define msm_set_voice_tx_mute(mute) (-EPERM)
-    #define msm_set_voice_rx_vol(volume) (-EPERM)
-    #define msm_set_device_volume(dev_id,volume) (-EPERM)
-    #define msm_reset_all_device() (-EPERM)
-#endif
 
 // hardware specific functions
 
@@ -64,7 +43,7 @@ extern "C" {
 #include <linux/spi_aic3254.h>
 }
 
-#define LOG_SND_RPC 1  // Set to 1 to log sound RPC's
+#define LOG_SND_RPC 0  // Set to 1 to log sound RPC's
 
 #define DUALMIC_KEY "dualmic_enabled"
 #define TTY_MODE_KEY "tty_mode"
@@ -89,7 +68,6 @@ extern "C" {
 namespace android {
 
 Mutex   mDeviceSwitchLock;
-static int audpre_index, tx_iir_index;
 static void * acoustic;
 const uint32_t AudioHardware::inputSamplingRates[] = {
     8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000
@@ -119,6 +97,8 @@ static const uint32_t SND_DEVICE_NO_MIC_HEADSET_BACK_MIC = 28;
 static const uint32_t SND_DEVICE_HEADSET_AND_SPEAKER_BACK_MIC = 30;
 static const uint32_t SND_DEVICE_I2S_SPEAKER = 32;
 static const uint32_t SND_DEVICE_BT_EC_OFF = 45;
+static const uint32_t SND_DEVICE_HAC = 252;
+static const uint32_t SND_DEVICE_USB_HEADSET = 253;
 
 static uint32_t DEVICE_HANDSET_RX = 0;           //handset_rx
 static uint32_t DEVICE_HANDSET_TX = 1;           //handset_tx
@@ -332,6 +312,24 @@ int enableDevice(int device,short enable) {
     return 0;
 }
 
+void updateACDB(uint32_t new_rx_device, uint32_t new_tx_device, uint32_t new_rx_acdb, uint32_t new_tx_acdb)
+{
+    LOGD("updateACDB: (%d, %d, %d, %d) ", new_tx_device, new_rx_device, new_tx_acdb, new_rx_acdb);
+
+    int rc = -1;
+    int (*update_acdb_id)(uint32_t, uint32_t, uint32_t, uint32_t);
+
+    update_acdb_id = (int (*)(uint32_t, uint32_t, uint32_t, uint32_t))::dlsym(acoustic, "update_acdb_id");
+    if ((*update_acdb_id) == 0 ) {
+        LOGE("Could not open update_acdb_id()");
+    }
+
+    rc = update_acdb_id(new_tx_device, new_rx_device, new_tx_acdb, new_rx_acdb);
+    if (rc < 0) {
+        LOGE("Could not set update_acdb_id: %d", rc);
+    }
+}
+
 static status_t updateDeviceInfo(int rx_device,int tx_device) {
     LOGD("updateDeviceInfo: E rx_device %d and tx_device %d", rx_device, tx_device);
     bool isRxDeviceEnabled = false,isTxDeviceEnabled = false;
@@ -417,7 +415,6 @@ static status_t updateDeviceInfo(int rx_device,int tx_device) {
                     return -1;
                 if(rx_device == temp_ptr->dev_id && tx_device == temp_ptr->dev_id_tx)
                     break;
-
                 msm_route_voice(DEV_ID(rx_device),DEV_ID(tx_device),1);
 
                 // Temporary work around for Speaker mode. The driver is not
@@ -479,6 +476,7 @@ AudioHardware::AudioHardware() :
     mOutput(0), mCurSndDevice(-1),
     mHACSetting(false),
     mBluetoothIdTx(0), mBluetoothIdRx(0),
+    mVoiceVolume(VOICE_VOLUME_MAX),
     mTtyMode(TTY_OFF), mDualMicEnabled(false), mFmFd(-1)
 {
     int (*snd_get_num)();
@@ -600,12 +598,18 @@ AudioHardware::AudioHardware() :
     if (rc < 0) {
         LOGD("Could not set aic3254 parameters to share memory: %d", rc);
         support_aic3254 = false;
+    } else {
+        // force volume scale 0-40
+        // aic3254_set_volume(30);
     }
 
     snd_get_num = (int (*)(void))::dlsym(acoustic, "snd_get_num");
     if ((*snd_get_num) == 0 ) {
         LOGD("Could not open snd_get_num()");
     }
+
+    vr_mode_change = false;
+    vr_mode_enabled = 0;
 
     mNumBTEndpoints = snd_get_num();
     LOGV("mNumBTEndpoints = %d", mNumBTEndpoints);
@@ -654,6 +658,8 @@ AudioStreamOut* AudioHardware::openOutputStream(
 {
     { // scope for the lock
         Mutex::Autolock lock(mLock);
+
+        LOGD("AudioHardware::openOutputStream");
 
         // only one output stream allowed
         if (mOutput) {
@@ -754,14 +760,18 @@ void AudioHardware::closeInputStream(AudioStreamIn* in) {
 
 status_t AudioHardware::setMode(int mode)
 {
-    if (support_aic3254)
-        do_aic3254_control(mode);
+    if (mode == AudioSystem::MODE_IN_CALL)
+        vr_mode_enabled = 0;
 
+    int prevMode = mMode;
     status_t status = AudioHardwareBase::setMode(mode);
     if (status == NO_ERROR) {
         // make sure that doAudioRouteOrMute() is called by doRouting()
         // even if the new device selected is the same as current one.
-        clearCurDevice();
+        if (((prevMode != AudioSystem::MODE_IN_CALL) && (mMode == AudioSystem::MODE_IN_CALL)) ||
+             ((prevMode == AudioSystem::MODE_IN_CALL) && (mMode != AudioSystem::MODE_IN_CALL))) {
+             clearCurDevice();
+        }
     }
     return status;
 }
@@ -812,7 +822,6 @@ status_t AudioHardware::setParameters(const String8& keyValuePairs)
     const char FM_VALUE_HEADSET[] = "headset";
     const char FM_VALUE_FALSE[] = "false";
 
-
     LOGV("setParameters() %s", keyValuePairs.string());
 
     if (keyValuePairs.length() == 0) return BAD_VALUE;
@@ -854,7 +863,7 @@ status_t AudioHardware::setParameters(const String8& keyValuePairs)
         } else {
             mTtyMode = TTY_OFF;
         }
-        if(mMode != AudioSystem::MODE_IN_CALL){
+        if(mMode != AudioSystem::MODE_IN_CALL) {
            return NO_ERROR;
         }
         LOGI("Changed TTY Mode=%s", value.string());
@@ -883,22 +892,6 @@ String8 AudioHardware::getParameters(const String8& keys)
 #endif
     LOGV("AudioHardware::getParameters() %s", param.toString().string());
     return param.toString();
-}
-
-static unsigned calculate_audpre_table_index(unsigned index)
-{
-    switch (index) {
-        case 48000:    return SAMP_RATE_INDX_48000;
-        case 44100:    return SAMP_RATE_INDX_44100;
-        case 32000:    return SAMP_RATE_INDX_32000;
-        case 24000:    return SAMP_RATE_INDX_24000;
-        case 22050:    return SAMP_RATE_INDX_22050;
-        case 16000:    return SAMP_RATE_INDX_16000;
-        case 12000:    return SAMP_RATE_INDX_12000;
-        case 11025:    return SAMP_RATE_INDX_11025;
-        case 8000:    return SAMP_RATE_INDX_8000;
-        default:     return -1;
-    }
 }
 
 size_t AudioHardware::getInputBufferSize(uint32_t sampleRate, int format, int channelCount)
@@ -963,6 +956,8 @@ status_t AudioHardware::setVoiceVolume(float v)
         return -1;
     }
     LOGV("msm_set_voice_rx_vol(%d) succeeded",vol);
+
+    mVoiceVolume = vol;
     return NO_ERROR;
 }
 
@@ -1010,7 +1005,8 @@ status_t AudioHardware::setMasterVolume(float v)
 }
 
 static status_t do_route_audio_rpc(uint32_t device,
-                                   bool ear_mute, bool mic_mute)
+                                   bool ear_mute, bool mic_mute,
+                                   uint32_t rx_acdb_id, uint32_t tx_acdb_id)
 {
     if(device == -1)
         return 0;
@@ -1088,7 +1084,16 @@ static status_t do_route_audio_rpc(uint32_t device,
         new_tx_device = DEVICE_HANDSET_TX;
         LOGV("In DEVICE_SPEAKER_HEADSET_RX and DEVICE_HANDSET_TX");
     }
-
+    else if(device == SND_DEVICE_USB_HEADSET) {
+        new_rx_device = DEVICE_USB_HEADSET_RX;
+        new_tx_device = DEVICE_SPEAKER_TX;
+        LOGV("In USB_HEADSET");
+    }
+    else if(device == SND_DEVICE_HAC) {
+        new_rx_device = DEVICE_HAC_RX;
+        new_tx_device = DEVICE_HANDSET_TX;
+        LOGV("In HAC");
+    }
 /* No framework support
     else if (device == SND_DEVICE_HDMI) {
         new_rx_device = DEVICE_HDMI_STERO_RX;
@@ -1108,6 +1113,7 @@ static status_t do_route_audio_rpc(uint32_t device,
             if ( (new_rx_device != INVALID_DEVICE) && (new_tx_device != INVALID_DEVICE))
             {
                 LOGD("Starting voice on Rx %d and Tx %d device", DEV_ID(new_rx_device), DEV_ID(new_tx_device));
+                updateACDB(new_rx_device, new_tx_device, rx_acdb_id, tx_acdb_id);
                 msm_route_voice(DEV_ID(new_rx_device),DEV_ID(new_tx_device), 1);
             }
             else
@@ -1121,17 +1127,17 @@ static status_t do_route_audio_rpc(uint32_t device,
             if(cur_tx == INVALID_DEVICE || new_tx_device == INVALID_DEVICE)
                 return -1;
 
-           //Enable RX device
-           if(new_rx_device != cur_rx) {
-               enableDevice(cur_rx,0);
-           }
-           enableDevice(new_rx_device,1);
+            //Enable RX device
+            if(new_rx_device != cur_rx) {
+                enableDevice(cur_rx,0);
+            }
+            enableDevice(new_rx_device,1);
 
-           //Enable TX device
-           if(new_tx_device != cur_tx) {
-               enableDevice(cur_tx,0);
-           }
-           enableDevice(new_tx_device,1);
+            //Enable TX device
+            if(new_tx_device != cur_tx) {
+                enableDevice(cur_tx,0);
+            }
+            enableDevice(new_tx_device,1);
 
             // start Voice call
             LOGD("Starting voice call and UnMuting the call");
@@ -1198,10 +1204,10 @@ status_t AudioHardware::doAudioRouteOrMute(uint32_t device)
         }
     }
 
-/* Force to Original until we get better idea on the DSP profile settings */
     if (support_aic3254) {
-        aic3254_config("Original");
-        do_aic3254_control(mMode);
+        aic3254_config(device, "Original");
+        do_aic3254_control(mMode, mRecordState,
+                           checkOutputStandby(), device);
     }
 
     if (device == (int) SND_DEVICE_BT) {
@@ -1239,9 +1245,25 @@ status_t AudioHardware::doAudioRouteOrMute(uint32_t device)
     }
     LOGV("doAudioRouteOrMute: rx acdb %d, tx acdb %d\n", rx_acdb_id, tx_acdb_id);
     LOGV("doAudioRouteOrMute() device %x, mMode %d, mMicMute %d", device, mMode, mMicMute);
-    return do_route_audio_rpc(device,
-                              mMode != AudioSystem::MODE_IN_CALL, mMicMute);
-//    return do_route_audio_dev_ctrl(device, mMode == AudioSystem::MODE_IN_CALL, rx_acdb_id, tx_acdb_id);
+
+    return do_route_audio_rpc(device,mMode != AudioSystem::MODE_IN_CALL, 
+                              mMicMute, rx_acdb_id, tx_acdb_id);
+}
+
+status_t AudioHardware::get_mMode(void)
+{
+    return mMode;
+}
+
+status_t AudioHardware::set_mRecordState(bool onoff)
+{
+    mRecordState = onoff;
+    return 0;
+}
+
+status_t AudioHardware::get_mRecordState(void)
+{
+    return mRecordState;
 }
 
 status_t AudioHardware::get_batt_temp(int *batt_temp)
@@ -1266,6 +1288,12 @@ status_t AudioHardware::get_batt_temp(int *batt_temp)
     *batt_temp = strtol(get_batt_temp, NULL, 10);
     close(fd);
     return NO_ERROR;
+}
+
+status_t AudioHardware::get_snd_dev(void)
+{
+    Mutex::Autolock lock(mLock);
+    return mCurSndDevice;
 }
 
 uint32_t AudioHardware::getACDB(int mode, int device)
@@ -1336,7 +1364,7 @@ uint32_t AudioHardware::getACDB(int mode, int device)
     return acdb_id;
 }
 
-status_t AudioHardware::do_aic3254_control(int mode)
+status_t AudioHardware::do_aic3254_control(int mode, bool Record, bool Standby, uint32_t Routes)
 {
 // This function must be rewritten
 // and should set bot RX and TX
@@ -1371,9 +1399,12 @@ status_t AudioHardware::do_aic3254_control(int mode)
     return NO_ERROR;
 }
 
-void AudioHardware::aic3254_config(const char* aic_effect)
+void AudioHardware::aic3254_config(uint32_t Routes, const char* aic_effect)
 {
     int (*set_sound_effect)(const char* effect);
+
+    if (mMode == AudioSystem::MODE_IN_CALL)
+        aic_effect = "DualMic_Phone";
 
     LOGD("aic3254_config effect: %s ", aic_effect);
 
@@ -1385,14 +1416,8 @@ void AudioHardware::aic3254_config(const char* aic_effect)
 
     int rc = set_sound_effect(aic_effect);
     if (rc < 0) {
-        LOGE("Could not set sound effect Original: %d", rc);
+        LOGE("Could not set sound effect %s: %d", aic_effect, rc);
     }
-
-// TEST set volume to 30 (0-40) and power on dsp tx/rx
-    aic3254_set_volume(30);
-    aic3254_ioctl(AIC3254_CONFIG_RX, PLAYBACK_SPEAKER);
-    aic3254_ioctl(AIC3254_CONFIG_TX, VOICERECORD_IMIC);
-// END TEST
 }
 
 int AudioHardware::aic3254_ioctl(int cmd, const int argc)
@@ -1564,10 +1589,23 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input)
     if ((mFmFd != -1) && !(outputDevices & AudioSystem::DEVICE_OUT_FM)){
         disableFM();
     }
-    if (sndDevice != -1 && sndDevice != mCurSndDevice) {
+    if ((vr_mode_change) || (sndDevice != -1 && sndDevice != mCurSndDevice)) {
         ret = doAudioRouteOrMute(sndDevice);
         mCurSndDevice = sndDevice;
+// DA RIVEDERE
+        if (mMode == AudioSystem::MODE_IN_CALL) {
+            if (mHACSetting && hac_enable && mCurSndDevice == (int) SND_DEVICE_HANDSET) {
+                LOGD("HAC enable: Setting in-call volume to maximum.\n");
+                set_volume_rpc(mCurSndDevice, SND_METHOD_VOICE, VOICE_VOLUME_MAX);
+            } else {
+                set_volume_rpc(mCurSndDevice, SND_METHOD_VOICE, mVoiceVolume);
+            }
+        }
+//////////
     }
+
+    if (support_aic3254)
+        aic3254_powerdown();
 
     return ret;
 }
@@ -1928,6 +1966,13 @@ ssize_t AudioHardware::AudioStreamOutMSM72xx::write(const void* buffer, size_t b
         // fill 2 buffers before AUDIO_START
         mStartCount = AUDIO_HW_NUM_OUT_BUF;
         mStandby = false;
+
+        if (support_aic3254) {
+            mHardware->do_aic3254_control(mHardware->get_mMode(),
+                                          mHardware->get_mRecordState(),
+                                          mHardware->checkOutputStandby(),
+                                          mHardware->get_snd_dev());
+        }
     }
 
     while (count) {
@@ -1960,6 +2005,10 @@ ssize_t AudioHardware::AudioStreamOutMSM72xx::write(const void* buffer, size_t b
                 LOGE("enableDevice failed for device cur_rx %d", cur_rx);
                 return 0;
             }
+
+            uint32_t rx_acdb_id = mHardware->getACDB(MOD_PLAY, mHardware->get_snd_dev());
+            updateACDB(cur_rx, cur_tx, rx_acdb_id, 0);
+
             if(msm_route_stream(PCM_PLAY, dec_id, DEV_ID(cur_rx), 1)) {
                 LOGE("msm_route_stream failed");
                 return 0;
@@ -2316,7 +2365,7 @@ status_t AudioHardware::AudioStreamInMSM72xx::set(
         LOGV("The Config buffer size is %d", config.buffer_size);
         LOGV("The Config buffer count is %d", config.buffer_count);
 
-        mSampleRate =8000;
+        mSampleRate = 8000;
         mFormat = *pFormat;
         mBufferSize = 230;
         struct msm_audio_evrc_enc_config evrc_enc_cfg;
@@ -2539,29 +2588,6 @@ status_t AudioHardware::AudioStreamInMSM72xx::set(
     //mHardware->setMicMute_nosync(false);
     mState = AUDIO_INPUT_OPENED;
 
-    if (!acoustic)
-        return NO_ERROR;
-
-    audpre_index = calculate_audpre_table_index(mSampleRate);
-    tx_iir_index = (audpre_index * 2) + (hw->checkOutputStandby() ? 0 : 1);
-    LOGD("audpre_index = %d, tx_iir_index = %d\n", audpre_index, tx_iir_index);
-
-    /**
-     * If audio-preprocessing failed, we should not block record.
-     */
-    int (*msm72xx_set_audpre_params)(int, int);
-    msm72xx_set_audpre_params = (int (*)(int, int))::dlsym(acoustic, "msm72xx_set_audpre_params");
-    status = msm72xx_set_audpre_params(audpre_index, tx_iir_index);
-    if (status < 0)
-        LOGE("Cannot set audpre parameters");
-
-    int (*msm72xx_enable_audpre)(int, int, int);
-    msm72xx_enable_audpre = (int (*)(int, int, int))::dlsym(acoustic, "msm72xx_enable_audpre");
-    mAcoustics = acoustic_flags;
-    status = msm72xx_enable_audpre((int)acoustic_flags, audpre_index, tx_iir_index);
-    if (status < 0)
-        LOGE("Cannot enable audpre");
-
     return NO_ERROR;
 
 Error:
@@ -2646,6 +2672,10 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes)
                 LOGE("enableDevice failed, device %d",cur_tx);
                 return -1;
             }
+
+            uint32_t tx_acdb_id = mHardware->getACDB(MOD_REC, mHardware->get_snd_dev());
+            updateACDB(cur_rx, cur_tx, 0, tx_acdb_id);
+
             if(msm_route_stream(PCM_REC, dec_id, DEV_ID(cur_tx), 1)) {
                 LOGE("msm_route_stream failed");
                 return -1;
@@ -2657,8 +2687,16 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes)
 
     if (mState < AUDIO_INPUT_STARTED) {
         // force routing to input device
+        mHardware->set_mRecordState(1);
         mHardware->clearCurDevice();
         mHardware->doRouting(this);
+        if (support_aic3254) {
+            mHardware->aic3254_config(mHardware->get_snd_dev(), "Original");
+            mHardware->do_aic3254_control(mHardware->get_mMode(),
+                                          1,
+                                          mHardware->checkOutputStandby(),
+                                          mHardware->get_snd_dev());
+        }
         if (ioctl(mFd, AUDIO_START, 0)) {
             LOGE("Error starting record");
             standby();
@@ -2804,6 +2842,18 @@ status_t AudioHardware::AudioStreamInMSM72xx::standby()
     bool isDriverClosed = false;
     LOGD("AudioStreamInMSM72xx::standby()");
     Routing_table* temp = NULL;
+
+    if (mHardware) {
+        mHardware->set_mRecordState(0);
+        if (support_aic3254) {
+            mHardware->aic3254_config(mHardware->get_snd_dev(), "Original");
+            mHardware->do_aic3254_control(mHardware->get_mMode(),
+                                          0,
+                                          mHardware->checkOutputStandby(),
+                                          mHardware->get_snd_dev());
+        }
+    }
+
     if (!mHardware) return -1;
     if (mState > AUDIO_INPUT_CLOSED) {
         if (mFd >= 0) {
@@ -2857,10 +2907,13 @@ status_t AudioHardware::AudioStreamInMSM72xx::standby()
         LOGV("Disable device");
         deleteFromTable(PCM_REC);
         updateDeviceInfo(cur_rx, cur_tx);
+        if (support_aic3254)
+            mHardware->aic3254_powerdown();
     }//mRecordingSession condition.
     // restore output routing if necessary
     mHardware->clearCurDevice();
     mHardware->doRouting(this);
+
     return NO_ERROR;
 }
 
@@ -2893,11 +2946,21 @@ status_t AudioHardware::AudioStreamInMSM72xx::dump(int fd, const Vector<String16
 status_t AudioHardware::AudioStreamInMSM72xx::setParameters(const String8& keyValuePairs)
 {
     AudioParameter param = AudioParameter(keyValuePairs);
-    String8 key = String8(AudioParameter::keyRouting);
     status_t status = NO_ERROR;
     int device;
+    String8 key = String8("vr_mode");
+    int enabled;
     LOGV("AudioStreamInMSM72xx::setParameters() %s", keyValuePairs.string());
 
+    // reading voice recognition mode parameter
+    if (param.getInt(key, device) == NO_ERROR) {
+        LOGV("set vr_mode_enabled to %d", enabled);
+        vr_mode_change = (vr_mode_enabled != enabled);
+        vr_mode_enabled = enabled;
+        param.remove(key);
+    }
+
+    key = String8(AudioParameter::keyRouting);
     if (param.getInt(key, device) == NO_ERROR) {
         LOGV("set input routing %x", device);
         if (device & (device - 1)) {
