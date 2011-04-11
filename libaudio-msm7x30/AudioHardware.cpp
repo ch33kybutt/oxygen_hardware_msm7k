@@ -684,6 +684,7 @@ AudioStreamOut* AudioHardware::openOutputStream(
     return mOutput;
 }
 
+#ifdef WITH_QCOM_LPA
 AudioStreamOut* AudioHardware::openOutputSession(
         uint32_t devices, int *format, status_t *status, int sessionId)
 {
@@ -704,6 +705,7 @@ AudioStreamOut* AudioHardware::openOutputSession(
     }
     return out;
 }
+#endif
 
 void AudioHardware::closeOutputStream(AudioStreamOut* out) {
     Mutex::Autolock lock(mLock);
@@ -1366,10 +1368,7 @@ uint32_t AudioHardware::getACDB(int mode, int device)
 
 status_t AudioHardware::do_aic3254_control(int mode, bool Record, bool Standby, uint32_t Routes)
 {
-// This function must be rewritten
-// and should set bot RX and TX
-
-    LOGD("do_aic3254_control mode: %d ", mode);
+    LOGD("do_aic3254_control mode: %d Record: %d Standby: %d device: %d", mode, Standby, Record, Routes);
 
     // Default OFF
     int new_txmode = UPLINK_OFF;

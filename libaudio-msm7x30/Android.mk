@@ -20,6 +20,10 @@ ifeq ($(BOARD_HAVE_BLUETOOTH),true)
   LOCAL_CFLAGS += -DWITH_A2DP
 endif
 
+ifeq ($(BOARD_USES_QCOM_LPA),true)
+  LOCAL_CFLAGS += -DWITH_QCOM_LPA
+endif
+
 include $(BUILD_SHARED_LIBRARY)
 
 # ---------------------------------------------------------------------------------
@@ -37,6 +41,10 @@ LOCAL_SHARED_LIBRARIES += libaudioalsa
 
 ifeq ($(BOARD_USE_QCOM_SPEECH),true)
   LOCAL_CFLAGS += -DWITH_QCOM_SPEECH
+endif
+
+ifeq ($(BOARD_USES_QCOM_LPA),true)
+  LOCAL_CFLAGS += -DWITH_QCOM_LPA
 endif
 
 ifeq ($TARGET_OS)-$(TARGET_SIMULATOR),linux-true)
