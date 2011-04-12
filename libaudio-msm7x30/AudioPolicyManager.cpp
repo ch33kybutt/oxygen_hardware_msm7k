@@ -24,8 +24,6 @@
 
 namespace android {
 
-
-
 // ----------------------------------------------------------------------------
 // AudioPolicyManager for msm7x30 platform
 // ----------------------------------------------------------------------------
@@ -510,7 +508,6 @@ void AudioPolicyManager::setPhoneState(int state)
         mLimitRingtoneVolume = false;
     }
 }
-
 
 #ifdef WITH_QCOM_LPA
 audio_io_handle_t AudioPolicyManager::getSession(AudioSystem::stream_type stream,
