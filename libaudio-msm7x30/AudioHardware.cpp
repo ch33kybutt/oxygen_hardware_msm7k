@@ -1053,6 +1053,11 @@ static status_t do_route_audio_rpc(uint32_t device,
         new_tx_device = DEVICE_HEADSET_TX;
         LOGV("In HEADSET");
     }
+    else if(device == SND_DEVICE_NO_MIC_HEADSET) {
+        new_rx_device = DEVICE_HEADSET_RX;
+        new_tx_device = DEVICE_HANDSET_TX;
+        LOGV("In NO MIC HEADSET");
+    }
     else if (device == SND_DEVICE_FM_HANDSET) {
         fm_device = DEVICE_FMRADIO_HANDSET_RX;
         LOGV("In FM HANDSET");
@@ -1269,7 +1274,7 @@ status_t AudioHardware::doAudioRouteOrMute(uint32_t device)
     LOGV("doAudioRouteOrMute: rx acdb %d, tx acdb %d\n", rx_acdb_id, tx_acdb_id);
     LOGV("doAudioRouteOrMute() device %x, mMode %d, mMicMute %d", device, mMode, mMicMute);
 
-    return do_route_audio_rpc(device,mMode != AudioSystem::MODE_IN_CALL, 
+    return do_route_audio_rpc(device, mMode != AudioSystem::MODE_IN_CALL,
                               mMicMute, rx_acdb_id, tx_acdb_id);
 }
 
