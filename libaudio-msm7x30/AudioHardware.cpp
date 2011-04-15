@@ -124,6 +124,7 @@ static int alt_enable = 0;
 static int hac_enable = 0;
 static uint32_t cur_aic_tx = 0;
 static uint32_t cur_aic_rx = 0;
+static const char * cur_aic_effect = NULL;
 
 int dev_cnt = 0;
 const char ** name = NULL;
@@ -1435,15 +1436,19 @@ void AudioHardware::aic3254_config(uint32_t Routes, const char* aic_effect)
 
     LOGD("aic3254_config effect: %s ", aic_effect);
 
-    set_sound_effect = (int (*)(const char*))::dlsym(acoustic, "set_sound_effect");
-    if ((*set_sound_effect) == 0 ) {
-        LOGE("Could not open set_sound_effect()");
-        return;
-    }
+    if (cur_aic_effect != aic_effect) {
+        set_sound_effect = (int (*)(const char*))::dlsym(acoustic, "set_sound_effect");
+        if ((*set_sound_effect) == 0 ) {
+            LOGE("Could not open set_sound_effect()");
+            return;
+        }
 
-    int rc = set_sound_effect(aic_effect);
-    if (rc < 0)
-        LOGE("Could not set sound effect %s: %d", aic_effect, rc);
+        int rc = set_sound_effect(aic_effect);
+        if (rc < 0)
+            LOGE("Could not set sound effect %s: %d", aic_effect, rc);
+        else
+            cur_aic_effect = aic_effect;
+    }
 }
 
 int AudioHardware::aic3254_ioctl(int cmd, const int argc)
