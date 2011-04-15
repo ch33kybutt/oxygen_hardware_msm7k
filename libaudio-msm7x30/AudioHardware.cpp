@@ -73,7 +73,6 @@ const uint32_t AudioHardware::inputSamplingRates[] = {
 };
 
 static const uint32_t INVALID_DEVICE = 65535;
-static const uint32_t SND_DEVICE_CURRENT = -1;
 static const uint32_t SND_DEVICE_HANDSET = 0;
 static const uint32_t SND_DEVICE_SPEAKER = 1;
 static const uint32_t SND_DEVICE_HEADSET = 2;
@@ -135,8 +134,8 @@ static uint32_t cur_rx = INVALID_DEVICE;
 typedef struct routing_table
 {
     unsigned short dec_id;
-    int dev_id;
-    int dev_id_tx;
+    uint32_t dev_id;
+    uint32_t dev_id_tx;
     int stream_type;
     bool active;
     struct routing_table *next;
@@ -329,7 +328,7 @@ void updateACDB(uint32_t new_rx_device, uint32_t new_tx_device, uint32_t new_rx_
     }
 }
 
-static status_t updateDeviceInfo(int rx_device,int tx_device) {
+static status_t updateDeviceInfo(uint32_t rx_device, uint32_t tx_device) {
     LOGD("updateDeviceInfo: E rx_device %d and tx_device %d", rx_device, tx_device);
     bool isRxDeviceEnabled = false,isTxDeviceEnabled = false;
     Routing_table *temp_ptr,*temp_head;
@@ -471,10 +470,8 @@ free(device_list);
 
 AudioHardware::AudioHardware() :
     mInit(false), mMicMute(true), mBluetoothNrec(true), mBluetoothId(0),
-    mOutput(0), mCurSndDevice(-1),
-    mHACSetting(false),
-    mBluetoothIdTx(0), mBluetoothIdRx(0),
-    mVoiceVolume(VOICE_VOLUME_MAX),
+    mHACSetting(false), mBluetoothIdTx(0), mBluetoothIdRx(0),
+    mOutput(0), mCurSndDevice(INVALID_DEVICE), mVoiceVolume(VOICE_VOLUME_MAX),
     mTtyMode(TTY_OFF), mDualMicEnabled(false), mFmFd(-1)
 {
     int (*snd_get_num)();
@@ -1002,10 +999,10 @@ status_t AudioHardware::setFmVolume(float v)
         return NO_ERROR;
     }
     if(msm_set_volume(temp->dec_id, vol)) {
-        LOGE("msm_set_volume(%d) failed for FM errno = %d",vol,errno);
+        LOGE("msm_set_volume(%f) failed for FM errno = %d", vol, errno);
         return -1;
     }
-    LOGV("msm_set_volume(%d) for FM succeeded",vol);
+    LOGV("msm_set_volume(%f) for FM succeeded", vol);
     return NO_ERROR;
 }
 
@@ -1031,10 +1028,9 @@ static status_t do_route_audio_rpc(uint32_t device,
                                    bool ear_mute, bool mic_mute,
                                    uint32_t rx_acdb_id, uint32_t tx_acdb_id)
 {
-    if(device == -1)
-        return 0;
+    uint32_t new_rx_device = INVALID_DEVICE, new_tx_device = INVALID_DEVICE,
+        fm_device = INVALID_DEVICE;
 
-    int new_rx_device = INVALID_DEVICE,new_tx_device = INVALID_DEVICE,fm_device = INVALID_DEVICE;
     Routing_table* temp = NULL;
     LOGV("do_route_audio_rpc(%d, %d, %d)", device, ear_mute, mic_mute);
 
@@ -1129,7 +1125,6 @@ static status_t do_route_audio_rpc(uint32_t device,
         LOGV("In DEVICE_HDMI_STERO_RX and cur_tx");
     }
 */
-
     if(new_rx_device != INVALID_DEVICE)
         LOGD("new_rx = %d", DEV_ID(new_rx_device));
     if(new_tx_device != INVALID_DEVICE)
@@ -1447,9 +1442,8 @@ void AudioHardware::aic3254_config(uint32_t Routes, const char* aic_effect)
     }
 
     int rc = set_sound_effect(aic_effect);
-    if (rc < 0) {
+    if (rc < 0)
         LOGE("Could not set sound effect %s: %d", aic_effect, rc);
-    }
 }
 
 int AudioHardware::aic3254_ioctl(int cmd, const int argc)
@@ -1502,7 +1496,7 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input)
     uint32_t outputDevices = mOutput->devices();
     status_t ret = NO_ERROR;
     int audProcess = (ADRC_DISABLE | EQ_DISABLE | RX_IIR_DISABLE);
-    int sndDevice = -1;
+    uint32_t sndDevice = INVALID_DEVICE;
 
     if (input != NULL) {
         uint32_t inputDevice = input->devices();
@@ -1545,7 +1539,7 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input)
         // if inputDevice == 0, restore output routing
     }
 
-    if (sndDevice == -1) {
+    if (sndDevice == INVALID_DEVICE) {
         if (outputDevices & (outputDevices - 1)) {
             if ((outputDevices & AudioSystem::DEVICE_OUT_SPEAKER) == 0) {
                 LOGW("Hardware does not support requested route combination (%#X),"
@@ -1621,12 +1615,12 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input)
     if ((mFmFd != -1) && !(outputDevices & AudioSystem::DEVICE_OUT_FM)){
         disableFM();
     }
-    if ((sndDevice != -1 && sndDevice != mCurSndDevice)) {
+    if ((sndDevice != INVALID_DEVICE && sndDevice != mCurSndDevice)) {
         ret = doAudioRouteOrMute(sndDevice);
         mCurSndDevice = sndDevice;
 // DA RIVEDERE
         if (mMode == AudioSystem::MODE_IN_CALL) {
-            if (mHACSetting && hac_enable && mCurSndDevice == (int) SND_DEVICE_HANDSET) {
+            if (mHACSetting && hac_enable && mCurSndDevice == SND_DEVICE_HANDSET) {
                 LOGD("HAC enable: Setting in-call volume to maximum.\n");
                 set_volume_rpc(mCurSndDevice, SND_METHOD_VOICE, VOICE_VOLUME_MAX);
             } else {
@@ -1668,7 +1662,7 @@ status_t AudioHardware::enableFM(int sndDevice)
            goto Error;
     }
     addToTable(session_id,cur_rx,INVALID_DEVICE,FM_RADIO,true);
-    if(sndDevice == mCurSndDevice || mCurSndDevice == -1) {
+    if(sndDevice == mCurSndDevice || mCurSndDevice == INVALID_DEVICE) {
         enableDevice(cur_rx, 1);
         msm_route_stream(PCM_PLAY,session_id,DEV_ID(cur_rx),1);
     }
@@ -1898,10 +1892,10 @@ status_t AudioHardware::AudioSessionOutMSM7xxx::setVolume(float left, float righ
     LOGV("Setting session volume to %f (available range is 0 to 100)\n", vol);
 
     if(msm_set_volume(mSessionId, vol)) {
-        LOGE("msm_set_volume(%d %f) failed errno = %d",mSessionId, vol,errno);
+        LOGE("msm_set_volume(%d %f) failed errno = %d", mSessionId, vol, errno);
         return -1;
     }
-    LOGV("msm_set_volume(%f) succeeded",vol);
+    LOGV("msm_set_volume(%f) succeeded", vol);
     return NO_ERROR;
 }
 
@@ -2074,7 +2068,7 @@ status_t AudioHardware::AudioStreamOutMSM72xx::standby()
         return NO_ERROR;
 
     LOGD("Deroute pcm out stream");
-    if(msm_route_stream(PCM_PLAY, temp->dec_id,DEV_ID(temp->dev_id), 0)) {
+    if(msm_route_stream(PCM_PLAY, temp->dec_id, DEV_ID(temp->dev_id), 0)) {
         LOGE("could not set stream routing\n");
         deleteFromTable(PCM_PLAY);
         return -1;
@@ -2702,14 +2696,14 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes)
                 LOGE("AUDIO_GET_SESSION_ID failed*********");
                 return -1;
             }
-            LOGV("dec_id = %d,cur_tx= %d",dec_id,cur_tx);
+            LOGV("dec_id = %d,cur_tx= %d", dec_id, cur_tx);
             if(cur_tx == INVALID_DEVICE)
                 cur_tx = DEVICE_HANDSET_TX;
 
             Mutex::Autolock lock(mDeviceSwitchLock);
 
             if(enableDevice(cur_tx, 1)) {
-                LOGE("enableDevice failed, device %d",cur_tx);
+                LOGE("enableDevice failed, device %d", cur_tx);
                 return -1;
             }
 
@@ -2720,7 +2714,7 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes)
                 LOGE("msm_route_stream failed");
                 return -1;
             }
-            addToTable(dec_id,cur_tx,INVALID_DEVICE,PCM_REC,true);
+            addToTable(dec_id,cur_tx, INVALID_DEVICE,PCM_REC, true);
             mFirstread = false;
         }
     }
@@ -2862,7 +2856,7 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes)
             }
             else if(bytesRead == 0)
             {
-             LOGI("Bytes Read = %d ,Buffer no longer sufficient",bytesRead);
+             LOGI("Bytes Read = %d ,Buffer no longer sufficient", bytesRead);
              break;
             } else {
                 if (errno != EAGAIN) return bytesRead;

@@ -331,7 +331,7 @@ public:
     virtual    void        closeInputStream(AudioStreamIn* in);
 
     virtual size_t getInputBufferSize(uint32_t sampleRate, int format, int channelCount);
-               void        clearCurDevice() { mCurSndDevice = -1; }
+               void        clearCurDevice() { mCurSndDevice = 65535; }
 
 protected:
     virtual status_t    dump(int fd, const Vector<String16>& args);
@@ -474,26 +474,24 @@ private:
 
             static const uint32_t inputSamplingRates[];
             bool        mRecordState;
+            bool        mInit;
+            bool        mMicMute;
+            bool        mBluetoothNrec;
+            uint32_t    mBluetoothId;
             bool        mHACSetting;
             uint32_t    mBluetoothIdTx;
             uint32_t    mBluetoothIdRx;
-            bool        mInit;
-            bool        mMicMute;
-            int         mFmFd;
-            bool        mBluetoothNrec;
-            uint32_t    mBluetoothId;
             AudioStreamOutMSM72xx*  mOutput;
             SortedVector <AudioStreamInMSM72xx*>   mInputs;
-
-            int mCurSndDevice;
-            int mNoiseSuppressionState;
-            int m7xsnddriverfd;
-            bool    mDualMicEnabled;
-            int     mTtyMode;
-            uint32_t mVoiceVolume;
-
             msm_bt_endpoint *mBTEndpoints;
-            int mNumBTEndpoints;
+            int         mNumBTEndpoints;
+            uint32_t    mCurSndDevice;
+            uint32_t    mVoiceVolume;
+            int         mTtyMode;
+            int         mNoiseSuppressionState;
+            int         m7xsnddriverfd;
+            bool        mDualMicEnabled;
+            int         mFmFd;
 
      friend class AudioStreamInMSM72xx;
             Mutex       mLock;
