@@ -973,9 +973,32 @@ status_t AudioHardware::setVoiceVolume(float v)
     LOGI("Setting in-call volume to %d (available range is 0 to 100)\n", vol);
 
     if(msm_set_voice_rx_vol(vol)) {
-        LOGE("msm_set_voice_rx_vol(%d) failed errno = %d",vol,errno);
+        LOGE("msm_set_voice_rx_vol(%d) failed errno = %d", vol, errno);
         return -1;
     }
+
+    if (mMode == AudioSystem::MODE_IN_CALL &&
+        mCurSndDevice != SND_DEVICE_BT &&
+        mCurSndDevice != SND_DEVICE_CARKIT &&
+        mCurSndDevice != SND_DEVICE_BT_EC_OFF)
+    {
+        uint32_t new_tx_acdb = getACDB(MOD_TX, mCurSndDevice);
+        uint32_t new_rx_acdb = getACDB(MOD_RX, mCurSndDevice);
+
+        int (*update_voice_acdb)(uint32_t, uint32_t);
+
+        update_voice_acdb = (int (*)(uint32_t, uint32_t))::dlsym(acoustic, "update_voice_acdb");
+        if ((*update_voice_acdb) == 0 ) {
+            LOGE("Could not open update_voice_acdb()");
+        }
+
+        int rc = update_voice_acdb(new_tx_acdb, new_rx_acdb);
+        if (rc < 0)
+            LOGE("Could not set update_voice_acdb: %d", rc);
+        else
+            LOGI("update_voice_acdb(%d, %d) succeeded", new_tx_acdb, new_rx_acdb);
+    }
+
     LOGV("msm_set_voice_rx_vol(%d) succeeded",vol);
 
     mVoiceVolume = vol;
@@ -1262,11 +1285,19 @@ status_t AudioHardware::doAudioRouteOrMute(uint32_t device)
         rx_acdb_id = ACDB_ID_HAC_HANDSET_SPKR;
         tx_acdb_id = ACDB_ID_HAC_HANDSET_MIC;
     } else {
-        if (!checkOutputStandby() || mMode != AudioSystem::MODE_IN_CALL)
-            rx_acdb_id = getACDB(MOD_PLAY, device);
-        if (mRecordState)
-            tx_acdb_id = getACDB(MOD_REC, device);
+        if (mMode != AudioSystem::MODE_IN_CALL) {
+            rx_acdb_id = getACDB(MOD_RX, device);
+            tx_acdb_id = getACDB(MOD_TX, device);
+        } else {
+            if (!checkOutputStandby()) {
+                rx_acdb_id = getACDB(MOD_PLAY, device);
+            }
+            if (mRecordState) {
+                tx_acdb_id = getACDB(MOD_REC, device);
+            }
+        }
     }
+
     LOGV("doAudioRouteOrMute: rx acdb %d, tx acdb %d\n", rx_acdb_id, tx_acdb_id);
     LOGV("doAudioRouteOrMute() device %x, mMode %d, mMicMute %d", device, mMode, mMicMute);
 
@@ -1324,62 +1355,94 @@ uint32_t AudioHardware::getACDB(int mode, int device)
 {
     uint32_t acdb_id = 0;
     int batt_temp = 0;
-    if (mMode == AudioSystem::MODE_IN_CALL) {
-        LOGD("skip update ACDB due to in-call");
-        return 0;
+
+    if (mMode == AudioSystem::MODE_IN_CALL &&
+        device <= SND_DEVICE_NO_MIC_HEADSET) {
+        if (mode == MOD_RX) {
+            switch (device) {
+                case SND_DEVICE_HANDSET:
+                    acdb_id = mVoiceVolume / 20 + 201;
+                    break;
+                case SND_DEVICE_HEADSET:
+                case SND_DEVICE_NO_MIC_HEADSET:
+                    acdb_id = mVoiceVolume / 20 + 401;
+                    break;
+                case SND_DEVICE_SPEAKER:
+                    acdb_id = mVoiceVolume / 20 + 601;
+                    break;
+                default:
+                    break;
+            }
+        } else if (mode == MOD_TX) {
+            switch (device) {
+                case SND_DEVICE_HANDSET:
+                    acdb_id = mVoiceVolume / 20 + 101;
+                    break;
+                case SND_DEVICE_HEADSET:
+                case SND_DEVICE_NO_MIC_HEADSET:
+                    acdb_id = mVoiceVolume / 20 + 301;
+                    break;
+                case SND_DEVICE_SPEAKER:
+                    acdb_id = mVoiceVolume / 20 + 501;
+                    break;
+                default:
+                    break;
+            }
+        }
+    } else {
+        if (mode == MOD_PLAY) {
+            switch (device) {
+                case SND_DEVICE_HEADSET:
+                case SND_DEVICE_NO_MIC_HEADSET:
+                case SND_DEVICE_NO_MIC_HEADSET_BACK_MIC:
+                case SND_DEVICE_FM_HEADSET:
+                    acdb_id = ACDB_ID_HEADSET_PLAYBACK;
+                    break;
+                case SND_DEVICE_SPEAKER:
+                case SND_DEVICE_FM_SPEAKER:
+                case SND_DEVICE_SPEAKER_BACK_MIC:
+                    acdb_id = ACDB_ID_SPKR_PLAYBACK;
+                    if(alt_enable) {
+                        LOGD("Enable ALT for speaker\n");
+                        if (get_batt_temp(&batt_temp) == NO_ERROR) {
+                            if (batt_temp < 50)
+                                acdb_id = ACDB_ID_ALT_SPKR_PLAYBACK;
+                            LOGD("ALT batt temp = %d\n", batt_temp);
+                        }
+                    }
+                    break;
+                case SND_DEVICE_HEADSET_AND_SPEAKER:
+                case SND_DEVICE_HEADSET_AND_SPEAKER_BACK_MIC:
+                    acdb_id = ACDB_ID_HEADSET_RINGTONE_PLAYBACK;
+                    break;
+                default:
+                    break;
+            }
+        } else if (mode == MOD_REC) {
+            switch (device) {
+                case SND_DEVICE_HEADSET:
+                case SND_DEVICE_FM_HEADSET:
+                case SND_DEVICE_FM_SPEAKER:
+                case SND_DEVICE_HEADSET_AND_SPEAKER:
+                    acdb_id = ACDB_ID_EXT_MIC_REC;
+                    break;
+                case SND_DEVICE_HANDSET:
+                case SND_DEVICE_NO_MIC_HEADSET:
+                case SND_DEVICE_SPEAKER:
+                    acdb_id = ACDB_ID_INT_MIC_REC;
+                    break;
+                case SND_DEVICE_SPEAKER_BACK_MIC:
+                case SND_DEVICE_NO_MIC_HEADSET_BACK_MIC:
+                case SND_DEVICE_HANDSET_BACK_MIC:
+                case SND_DEVICE_HEADSET_AND_SPEAKER_BACK_MIC:
+                    acdb_id = ACDB_ID_CAMCORDER;
+                    break;
+                default:
+                    break;
+            }
+        }
     }
 
-    if (mode == MOD_PLAY) {
-        switch (device) {
-            case SND_DEVICE_HEADSET:
-            case SND_DEVICE_NO_MIC_HEADSET:
-            case SND_DEVICE_NO_MIC_HEADSET_BACK_MIC:
-            case SND_DEVICE_FM_HEADSET:
-                acdb_id = ACDB_ID_HEADSET_PLAYBACK;
-                break;
-            case SND_DEVICE_SPEAKER:
-            case SND_DEVICE_FM_SPEAKER:
-            case SND_DEVICE_SPEAKER_BACK_MIC:
-                acdb_id = ACDB_ID_SPKR_PLAYBACK;
-                if(alt_enable) {
-                    LOGD("Enable ALT for speaker\n");
-                    if (get_batt_temp(&batt_temp) == NO_ERROR) {
-                        if (batt_temp < 50)
-                            acdb_id = ACDB_ID_ALT_SPKR_PLAYBACK;
-                        LOGD("ALT batt temp = %d\n", batt_temp);
-                    }
-                }
-                break;
-            case SND_DEVICE_HEADSET_AND_SPEAKER:
-            case SND_DEVICE_HEADSET_AND_SPEAKER_BACK_MIC:
-                acdb_id = ACDB_ID_HEADSET_RINGTONE_PLAYBACK;
-                break;
-            default:
-                break;
-        }
-    } else if (mode == MOD_REC) {
-        switch (device) {
-            case SND_DEVICE_HEADSET:
-            case SND_DEVICE_FM_HEADSET:
-            case SND_DEVICE_FM_SPEAKER:
-            case SND_DEVICE_HEADSET_AND_SPEAKER:
-                acdb_id = ACDB_ID_EXT_MIC_REC;
-                break;
-            case SND_DEVICE_HANDSET:
-            case SND_DEVICE_NO_MIC_HEADSET:
-            case SND_DEVICE_SPEAKER:
-                    acdb_id = ACDB_ID_INT_MIC_REC;
-                break;
-            case SND_DEVICE_SPEAKER_BACK_MIC:
-            case SND_DEVICE_NO_MIC_HEADSET_BACK_MIC:
-            case SND_DEVICE_HANDSET_BACK_MIC:
-            case SND_DEVICE_HEADSET_AND_SPEAKER_BACK_MIC:
-                acdb_id = ACDB_ID_CAMCORDER;
-                break;
-            default:
-                break;
-        }
-    }
     LOGV("getACDB, return ID %d\n", acdb_id);
     return acdb_id;
 }
@@ -3321,8 +3384,6 @@ static int amrsup_if1_framing(
 
       /* frame_len already updated with correct number of bits */
       break;
-
-
 
     default:
       LOGE("Unsupported frame type %d", frame_type);

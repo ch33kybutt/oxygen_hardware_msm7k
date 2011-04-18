@@ -51,6 +51,8 @@ namespace android {
 
 #define MOD_PLAY 1
 #define MOD_REC  2
+#define MOD_TX   3
+#define MOD_RX   4
 
 #define ACDB_ID_HAC_HANDSET_MIC 107
 #define ACDB_ID_HAC_HANDSET_SPKR 207
