@@ -330,7 +330,8 @@ void updateACDB(uint32_t new_rx_device, uint32_t new_tx_device, uint32_t new_rx_
     }
 }
 
-static status_t updateDeviceInfo(uint32_t rx_device, uint32_t tx_device) {
+static status_t updateDeviceInfo(uint32_t rx_device, uint32_t tx_device,
+                                 uint32_t rx_acdb_id, uint32_t tx_acdb_id ) {
     LOGD("updateDeviceInfo: E rx_device %d and tx_device %d", rx_device, tx_device);
     bool isRxDeviceEnabled = false,isTxDeviceEnabled = false;
     Routing_table *temp_ptr,*temp_head;
@@ -385,7 +386,6 @@ static status_t updateDeviceInfo(uint32_t rx_device, uint32_t tx_device) {
                 cur_rx = rx_device ;
                 break;
             case PCM_REC:
-
                 LOGD("case PCM_REC");
                 if(tx_device == INVALID_DEVICE)
                     return -1;
@@ -408,12 +408,13 @@ static status_t updateDeviceInfo(uint32_t rx_device, uint32_t tx_device) {
                 cur_rx = rx_device ;
                 break;
             case VOICE_CALL:
-
                 LOGD("case VOICE_CALL");
                 if(rx_device == INVALID_DEVICE || tx_device == INVALID_DEVICE)
                     return -1;
                 if(rx_device == temp_ptr->dev_id && tx_device == temp_ptr->dev_id_tx)
                     break;
+
+                updateACDB(rx_device, tx_device, rx_acdb_id, tx_acdb_id);
                 msm_route_voice(DEV_ID(rx_device),DEV_ID(tx_device),1);
 
                 // Temporary work around for Speaker mode. The driver is not
@@ -1174,46 +1175,42 @@ static status_t do_route_audio_rpc(uint32_t device,
 
     if (ear_mute == false && !isStreamOn(VOICE_CALL)) {
         LOGV("Going to enable RX/TX device for voice stream");
-            // Routing Voice
-            if ( (new_rx_device != INVALID_DEVICE) && (new_tx_device != INVALID_DEVICE))
-            {
-                LOGD("Starting voice on Rx %d and Tx %d device", DEV_ID(new_rx_device), DEV_ID(new_tx_device));
-                updateACDB(new_rx_device, new_tx_device, rx_acdb_id, tx_acdb_id);
-                msm_route_voice(DEV_ID(new_rx_device),DEV_ID(new_tx_device), 1);
-            }
-            else
-            {
-                return -1;
-            }
+        // Routing Voice
+        if ( (new_rx_device != INVALID_DEVICE) && (new_tx_device != INVALID_DEVICE)) {
+            LOGD("Starting voice on Rx %d and Tx %d device", DEV_ID(new_rx_device), DEV_ID(new_tx_device));
+            updateACDB(new_rx_device, new_tx_device, rx_acdb_id, tx_acdb_id);
+            msm_route_voice(DEV_ID(new_rx_device),DEV_ID(new_tx_device), 1);
+        } else {
+            return -1;
+        }
 
-            if(cur_rx == INVALID_DEVICE || new_rx_device == INVALID_DEVICE)
-                return -1;
+        if(cur_rx == INVALID_DEVICE || new_rx_device == INVALID_DEVICE)
+            return -1;
 
-            if(cur_tx == INVALID_DEVICE || new_tx_device == INVALID_DEVICE)
-                return -1;
+        if(cur_tx == INVALID_DEVICE || new_tx_device == INVALID_DEVICE)
+            return -1;
 
-            //Enable RX device
-            if(new_rx_device != cur_rx) {
-                enableDevice(cur_rx,0);
-            }
-            enableDevice(new_rx_device,1);
+        //Enable RX device
+        if(new_rx_device != cur_rx) {
+            enableDevice(cur_rx,0);
+        }
+        enableDevice(new_rx_device,1);
 
-            //Enable TX device
-            if(new_tx_device != cur_tx) {
-                enableDevice(cur_tx,0);
-            }
-            enableDevice(new_tx_device,1);
+        //Enable TX device
+        if(new_tx_device != cur_tx) {
+            enableDevice(cur_tx,0);
+        }
+        enableDevice(new_tx_device,1);
 
-            // start Voice call
-            LOGD("Starting voice call and UnMuting the call");
-            msm_start_voice();
-            msm_set_voice_tx_mute(0);
-            cur_rx = new_rx_device;
-            cur_tx = new_tx_device;
-            addToTable(0,cur_rx,cur_tx,VOICE_CALL,true);
-            updateDeviceInfo(new_rx_device,new_tx_device);
-    }
-    else if (ear_mute == true && isStreamOnAndActive(VOICE_CALL)) {
+        // start Voice call
+        LOGD("Starting voice call and UnMuting the call");
+        msm_start_voice();
+        msm_set_voice_tx_mute(0);
+        cur_rx = new_rx_device;
+        cur_tx = new_tx_device;
+        addToTable(0,cur_rx,cur_tx,VOICE_CALL,true);
+        updateDeviceInfo(new_rx_device, new_tx_device, rx_acdb_id, tx_acdb_id);
+    } else if (ear_mute == true && isStreamOnAndActive(VOICE_CALL)) {
         LOGV("Going to disable RX/TX device during end of voice call");
         temp = getNodeByStreamType(VOICE_CALL);
         if(temp == NULL)
@@ -1223,14 +1220,14 @@ static status_t do_route_audio_rpc(uint32_t device,
         LOGD("Ending Voice call");
         msm_end_voice();
         deleteFromTable(VOICE_CALL);
-        updateDeviceInfo(new_rx_device,new_tx_device);
+        updateDeviceInfo(new_rx_device, new_tx_device, 0, 0);
         if(new_rx_device != INVALID_DEVICE && new_tx_device != INVALID_DEVICE) {
             cur_rx = new_rx_device;
             cur_tx = new_tx_device;
         }
     }
     else {
-        updateDeviceInfo(new_rx_device,new_tx_device);
+        updateDeviceInfo(new_rx_device, new_tx_device, rx_acdb_id, tx_acdb_id);
     }
     return NO_ERROR;
 }
@@ -1275,7 +1272,7 @@ status_t AudioHardware::doAudioRouteOrMute(uint32_t device)
                            checkOutputStandby(), device);
     }
 
-    if (device == (int) SND_DEVICE_BT) {
+    if (device == SND_DEVICE_BT) {
         if (mBluetoothIdTx != 0) {
             rx_acdb_id = mBluetoothIdRx;
             tx_acdb_id = mBluetoothIdTx;
@@ -1285,8 +1282,8 @@ status_t AudioHardware::doAudioRouteOrMute(uint32_t device)
             tx_acdb_id = mBTEndpoints[0].tx;
             LOGD("Update ACDB ID to default BT setting\n");
         }
-    }  else if (device == (int) SND_DEVICE_CARKIT
-                || device == (int) SND_DEVICE_BT_EC_OFF) {
+    }  else if (device == SND_DEVICE_CARKIT
+                || device == SND_DEVICE_BT_EC_OFF) {
         if (mBluetoothIdTx != 0) {
             rx_acdb_id = mBluetoothIdRx;
             tx_acdb_id = mBluetoothIdTx;
@@ -1298,7 +1295,7 @@ status_t AudioHardware::doAudioRouteOrMute(uint32_t device)
         }
     } else if (mMode == AudioSystem::MODE_IN_CALL
                && hac_enable && mHACSetting &&
-               device == (int) SND_DEVICE_HANDSET) {
+               device == SND_DEVICE_HANDSET) {
         LOGD("Update acdb id to hac profile.");
         rx_acdb_id = ACDB_ID_HAC_HANDSET_SPKR;
         tx_acdb_id = ACDB_ID_HAC_HANDSET_MIC;
@@ -1369,7 +1366,7 @@ status_t AudioHardware::get_snd_dev(void)
     return mCurSndDevice;
 }
 
-uint32_t AudioHardware::getACDB(int mode, int device)
+uint32_t AudioHardware::getACDB(int mode, uint32_t device)
 {
     uint32_t acdb_id = 0;
     int batt_temp = 0;
@@ -1908,7 +1905,7 @@ status_t AudioHardware::AudioSessionOutMSM7xxx::standby()
         return -1;
     }
     deleteFromTable(LPA_DECODE);
-    updateDeviceInfo(cur_rx, cur_tx);
+    updateDeviceInfo(cur_rx, cur_tx, 0, 0);
     mStandby = true;
     return status;
 }
@@ -2160,7 +2157,7 @@ status_t AudioHardware::AudioStreamOutMSM72xx::standby()
         return -1;
     }
     deleteFromTable(PCM_PLAY);
-    updateDeviceInfo(cur_rx, cur_tx);
+    updateDeviceInfo(cur_rx, cur_tx, 0, 0);
 
     if (!mStandby && mFd >= 0) {
         ::close(mFd);
@@ -3028,7 +3025,7 @@ status_t AudioHardware::AudioStreamInMSM72xx::standby()
         }
         LOGV("Disable device");
         deleteFromTable(PCM_REC);
-        updateDeviceInfo(cur_rx, cur_tx);
+        updateDeviceInfo(cur_rx, cur_tx, 0, 0);
         if (support_aic3254)
             mHardware->aic3254_powerdown();
     }//mRecordingSession condition.
