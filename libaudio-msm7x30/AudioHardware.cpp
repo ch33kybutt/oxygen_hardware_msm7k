@@ -1303,7 +1303,7 @@ status_t AudioHardware::doAudioRouteOrMute(uint32_t device)
         rx_acdb_id = ACDB_ID_HAC_HANDSET_SPKR;
         tx_acdb_id = ACDB_ID_HAC_HANDSET_MIC;
     } else {
-        if (mMode != AudioSystem::MODE_IN_CALL) {
+        if (mMode == AudioSystem::MODE_IN_CALL) {
             rx_acdb_id = getACDB(MOD_RX, device);
             tx_acdb_id = getACDB(MOD_TX, device);
         } else {
