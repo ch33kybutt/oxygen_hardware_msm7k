@@ -981,15 +981,15 @@ status_t AudioHardware::setVoiceVolume(float v)
     int vol = lrint(v * 100.0);
     if (mCurSndDevice == SND_DEVICE_HAC) {
         LOGI("HAC enable: Setting in-call volume to maximum.\n");
-        if(msm_set_voice_rx_vol(100)) {
-            LOGE("msm_set_voice_rx_vol(100) failed errno = %d", errno);
+        if (msm_set_voice_rx_vol(VOICE_VOLUME_MAX)) {
+            LOGE("msm_set_voice_rx_vol(%d) failed errno = %d", VOICE_VOLUME_MAX, errno);
             return -1;
         }
     } else {
         LOGD("setVoiceVolume(%f)\n", v);
         LOGI("Setting in-call volume to %d (available range is 0 to 100)\n", vol);
 
-        if(msm_set_voice_rx_vol(vol)) {
+        if (msm_set_voice_rx_vol(vol)) {
             LOGE("msm_set_voice_rx_vol(%d) failed errno = %d", vol, errno);
             return -1;
         }
@@ -1704,16 +1704,16 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input)
     if ((sndDevice != INVALID_DEVICE && sndDevice != mCurSndDevice)) {
         ret = doAudioRouteOrMute(sndDevice);
         mCurSndDevice = sndDevice;
-// DA RIVEDERE
         if (mMode == AudioSystem::MODE_IN_CALL) {
-            if (mHACSetting && hac_enable && mCurSndDevice == SND_DEVICE_HANDSET) {
+            if (mHACSetting && hac_enable && mCurSndDevice == SND_DEVICE_HAC) {
                 LOGD("HAC enable: Setting in-call volume to maximum.\n");
-                set_volume_rpc(mCurSndDevice, SND_METHOD_VOICE, VOICE_VOLUME_MAX);
+                if (msm_set_voice_rx_vol(VOICE_VOLUME_MAX))
+                    LOGE("msm_set_voice_rx_vol(%d) failed errno = %d", VOICE_VOLUME_MAX, errno);
             } else {
-                set_volume_rpc(mCurSndDevice, SND_METHOD_VOICE, mVoiceVolume);
+                if (msm_set_voice_rx_vol(mVoiceVolume))
+                    LOGE("msm_set_voice_rx_vol(%d) failed errno = %d", mVoiceVolume, errno);
             }
         }
-//////////
     }
 
     if (support_aic3254)
