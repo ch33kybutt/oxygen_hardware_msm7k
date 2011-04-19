@@ -978,14 +978,21 @@ status_t AudioHardware::setVoiceVolume(float v)
         LOGW("setVoiceVolume(%f) over 1.0, assuming 1.0\n", v);
         v = 1.0;
     }
-
     int vol = lrint(v * 100.0);
-    LOGD("setVoiceVolume(%f)\n", v);
-    LOGI("Setting in-call volume to %d (available range is 0 to 100)\n", vol);
+    if (mCurSndDevice == SND_DEVICE_HAC) {
+        LOGI("HAC enable: Setting in-call volume to maximum.\n");
+        if(msm_set_voice_rx_vol(100)) {
+            LOGE("msm_set_voice_rx_vol(100) failed errno = %d", errno);
+            return -1;
+        }
+    } else {
+        LOGD("setVoiceVolume(%f)\n", v);
+        LOGI("Setting in-call volume to %d (available range is 0 to 100)\n", vol);
 
-    if(msm_set_voice_rx_vol(vol)) {
-        LOGE("msm_set_voice_rx_vol(%d) failed errno = %d", vol, errno);
-        return -1;
+        if(msm_set_voice_rx_vol(vol)) {
+            LOGE("msm_set_voice_rx_vol(%d) failed errno = %d", vol, errno);
+            return -1;
+        }
     }
 
     if (mMode == AudioSystem::MODE_IN_CALL &&
@@ -1010,7 +1017,7 @@ status_t AudioHardware::setVoiceVolume(float v)
             LOGI("update_voice_acdb(%d, %d) succeeded", new_tx_acdb, new_rx_acdb);
     }
 
-    LOGV("msm_set_voice_rx_vol(%d) succeeded",vol);
+    LOGV("msm_set_voice_rx_vol(%d) succeeded", vol);
 
     mVoiceVolume = vol;
     return NO_ERROR;
