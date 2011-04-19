@@ -120,6 +120,7 @@ static uint32_t DEVICE_BT_SCO_TX = 18;           //bt_sco_tx
 static uint32_t DEVICE_COUNT = DEVICE_BT_SCO_TX +1;
 
 static bool support_aic3254 = true;
+static bool support_tpa2051 = true;
 static int alt_enable = 0;
 static int hac_enable = 0;
 static uint32_t cur_aic_tx = 0;
@@ -478,6 +479,7 @@ AudioHardware::AudioHardware() :
     int (*snd_get_num)();
     int (*snd_get_bt_endpoint)(msm_bt_endpoint *);
     int (*set_acoustic_parameters)();
+    int (*set_tpa2051_parameters)();
     int (*set_aic3254_parameters)();
 
     struct msm_bt_endpoint *ept;
@@ -584,21 +586,6 @@ AudioHardware::AudioHardware() :
         LOGD("Could not set acoustic parameters to share memory: %d", rc);
     }
 
-    set_aic3254_parameters = (int (*)(void))::dlsym(acoustic, "set_aic3254_parameters");
-    if ((*set_aic3254_parameters) == 0 ) {
-        LOGE("Could not open set_aic3254_parameters()");
-        return;
-    }
-
-    rc = set_aic3254_parameters();
-    if (rc < 0) {
-        LOGD("Could not set aic3254 parameters to share memory: %d", rc);
-        support_aic3254 = false;
-    } else {
-        // force volume scale 0-40
-        // aic3254_set_volume(30);
-    }
-
     snd_get_num = (int (*)(void))::dlsym(acoustic, "snd_get_num");
     if ((*snd_get_num) == 0 ) {
         LOGD("Could not open snd_get_num()");
@@ -631,6 +618,30 @@ AudioHardware::AudioHardware() :
     property_get("htc.audio.hac.enable", value, "0");
     hac_enable = atoi(value);
     LOGV("Enable HAC function: %d", hac_enable);
+
+    set_tpa2051_parameters = (int (*)(void))::dlsym(acoustic, "set_tpa2051_parameters");
+    if ((*set_tpa2051_parameters) == 0) {
+        LOGE("Could not open set_tpa2051_parameters()");
+        return;
+    }
+
+    rc = set_tpa2051_parameters();
+    if (rc < 0) {
+        LOGD("Could not set tpa2051 parameters to share memory: %d", rc);
+        support_tpa2051 = false;
+    }
+
+    set_aic3254_parameters = (int (*)(void))::dlsym(acoustic, "set_aic3254_parameters");
+    if ((*set_aic3254_parameters) == 0 ) {
+        LOGE("Could not open set_aic3254_parameters()");
+        return;
+    }
+
+    rc = set_aic3254_parameters();
+    if (rc < 0) {
+        LOGD("Could not set aic3254 parameters to share memory: %d", rc);
+        support_aic3254 = false;
+    }
 
     mInit = true;
 }
