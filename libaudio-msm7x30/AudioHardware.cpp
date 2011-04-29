@@ -996,6 +996,9 @@ status_t AudioHardware::setVoiceVolume(float v)
         }
     }
 
+    mVoiceVolume = vol;
+    LOGV("msm_set_voice_rx_vol(%d) succeeded", vol);
+
     if (mMode == AudioSystem::MODE_IN_CALL &&
         mCurSndDevice != SND_DEVICE_BT &&
         mCurSndDevice != SND_DEVICE_CARKIT &&
@@ -1018,9 +1021,6 @@ status_t AudioHardware::setVoiceVolume(float v)
             LOGI("update_voice_acdb(%d, %d) succeeded", new_tx_acdb, new_rx_acdb);
     }
 
-    LOGV("msm_set_voice_rx_vol(%d) succeeded", vol);
-
-    mVoiceVolume = vol;
     return NO_ERROR;
 }
 
