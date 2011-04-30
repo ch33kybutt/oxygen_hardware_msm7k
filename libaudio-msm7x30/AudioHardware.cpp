@@ -52,11 +52,7 @@ extern "C" {
 #define EVRC_DEVICE_IN "/dev/msm_evrc_in"
 #define QCELP_DEVICE_IN "/dev/msm_qcelp_in"
 #endif
-
 #define AAC_DEVICE_IN "/dev/msm_aac_in"
-#define FM_DEVICE  "/dev/msm_fm"
-#define FM_A2DP_REC 1
-#define FM_FILE_REC 2
 
 #ifdef WITH_QCOM_SPEECH
 #define AMRNB_FRAME_SIZE 32
@@ -160,19 +156,8 @@ PCM_PLAY=1,
 PCM_REC,
 LPA_DECODE,
 VOICE_CALL,
-FM_RADIO,
-FM_REC,
-FM_A2DP
+FM_RADIO
 };
-
-enum FM_STATE {
-    FM_INVALID=1,
-    FM_OFF,
-    FM_ON
-};
-
-FM_STATE fmState = FM_INVALID;
-static uint32_t fmDevice = INVALID_DEVICE;
 
 #define DEV_ID(X) device_list[X].dev_id
 void addToTable(int decoder_id,int device_id,int device_id_tx,int stream_type,bool active) {
@@ -475,7 +460,7 @@ AudioHardware::AudioHardware() :
     mInit(false), mMicMute(true), mBluetoothNrec(true), mBluetoothId(0),
     mHACSetting(false), mBluetoothIdTx(0), mBluetoothIdRx(0),
     mOutput(0), mCurSndDevice(INVALID_DEVICE), mVoiceVolume(VOICE_VOLUME_MAX),
-    mTtyMode(TTY_OFF), mDualMicEnabled(false), mFmFd(-1)
+    mTtyMode(TTY_OFF), mDualMicEnabled(false)
 {
     int (*snd_get_num)();
     int (*snd_get_bt_endpoint)(msm_bt_endpoint *);
@@ -833,11 +818,6 @@ status_t AudioHardware::setParameters(const String8& keyValuePairs)
     const char BT_NREC_VALUE_ON[] = "on";
     const char HAC_KEY[] = "HACSetting";
     const char HAC_VALUE_ON[] = "ON";
-    const char FM_NAME_KEY[] = "FMRadioOn";
-    const char FM_VALUE_HANDSET[] = "handset";
-    const char FM_VALUE_SPEAKER[] = "speaker";
-    const char FM_VALUE_HEADSET[] = "headset";
-    const char FM_VALUE_FALSE[] = "false";
 
     LOGV("setParameters() %s", keyValuePairs.string());
 
@@ -1024,6 +1004,7 @@ status_t AudioHardware::setVoiceVolume(float v)
     return NO_ERROR;
 }
 
+/*
 status_t AudioHardware::setFmVolume(float v)
 {
     if (v < 0.0) {
@@ -1046,6 +1027,41 @@ status_t AudioHardware::setFmVolume(float v)
         return -1;
     }
     LOGV("msm_set_volume(%f) for FM succeeded", vol);
+    return NO_ERROR;
+}
+*/
+
+static status_t set_volume_fm(uint32_t volume)
+{
+    int returnval = 0;
+    float ratio = 2.5;
+
+    char s1[100] = "hcitool cmd 0x3f 0xa 0x5 0xc0 0x41 0xf 0 0x20 0 0 0";
+    char s2[100] = "hcitool cmd 0x3f 0xa 0x5 0xe4 0x41 0xf 0 0x00 0 0 0";
+    char s3[100] = "hcitool cmd 0x3f 0xa 0x5 0xe0 0x41 0xf 0 ";
+
+    char stemp[10] = "";
+    char *pstarget = s3;
+
+    volume = (unsigned int)(volume * ratio);
+
+    sprintf(stemp, "0x%x ", volume);
+    pstarget = strcat(s3, stemp);
+    pstarget = strcat(s3, "0 0 0");
+
+    system(s1);
+    system(s2);
+    system(s3);
+
+    return returnval;
+}
+
+status_t AudioHardware::setFmVolume(float v)
+{
+    int vol = AudioSystem::logToLinear(v);
+    LOGV("setFmVolume %d", vol);
+    set_volume_fm(vol);
+
     return NO_ERROR;
 }
 
@@ -1667,16 +1683,31 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input)
                 sndDevice = SND_DEVICE_HEADPHONE_AND_SPEAKER;
                 audProcess = (ADRC_ENABLE | EQ_ENABLE | RX_IIR_ENABLE | MBADRC_ENABLE);
             } else {
-                LOGI("Routing audio to No microphone Wired Headset (%d,%x)\n", mMode, outputDevices);
-                sndDevice = SND_DEVICE_NO_MIC_HEADSET;
+                if (outputDevices & AudioSystem::DEVICE_OUT_FM) {
+                    LOGI("Routing FM audio to No microphone Wired Headset (%d,%x)\n", mMode, outputDevices);
+                    sndDevice = SND_DEVICE_FM_HEADSET;
+                } else {
+                    LOGI("Routing audio to No microphone Wired Headset (%d,%x)\n", mMode, outputDevices);
+                    sndDevice = SND_DEVICE_NO_MIC_HEADSET;
+                }
             }
         } else if (outputDevices & AudioSystem::DEVICE_OUT_WIRED_HEADSET) {
-            LOGI("Routing audio to Wired Headset\n");
-            sndDevice = SND_DEVICE_HEADSET;
+            if (outputDevices & AudioSystem::DEVICE_OUT_FM) {
+                LOGI("Routing FM audio to Wired Headset\n");
+                sndDevice = SND_DEVICE_FM_HEADSET;
+            } else {
+                LOGI("Routing audio to Wired Headset\n");
+                sndDevice = SND_DEVICE_HEADSET;
+            }
             audProcess = (ADRC_ENABLE | EQ_ENABLE | RX_IIR_ENABLE | MBADRC_ENABLE);
         } else if (outputDevices & AudioSystem::DEVICE_OUT_SPEAKER) {
-            LOGI("Routing audio to Speakerphone\n");
-            sndDevice = SND_DEVICE_SPEAKER;
+            if (outputDevices & AudioSystem::DEVICE_OUT_FM) {
+                LOGI("Routing FM audio to Speakerphone\n");
+                sndDevice = SND_DEVICE_FM_SPEAKER;
+            } else {
+                LOGI("Routing audio to Speakerphone\n");
+                sndDevice = SND_DEVICE_SPEAKER;
+            }
             audProcess = (ADRC_ENABLE | EQ_ENABLE | RX_IIR_ENABLE | MBADRC_ENABLE);
         } else if(outputDevices & AudioSystem::DEVICE_OUT_EARPIECE){
             LOGI("Routing audio to Handset\n");
@@ -1694,12 +1725,12 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input)
             sndDevice = SND_DEVICE_IN_S_SADC_OUT_SPEAKER_PHONE;
         }
     }
-    if ((outputDevices & AudioSystem::DEVICE_OUT_FM) && (mFmFd == -1)){
+
+    if (outputDevices & AudioSystem::DEVICE_OUT_FM)
         enableFM(sndDevice);
-    }
-    if ((mFmFd != -1) && !(outputDevices & AudioSystem::DEVICE_OUT_FM)){
+    else
         disableFM();
-    }
+
     if ((sndDevice != INVALID_DEVICE && sndDevice != mCurSndDevice)) {
         ret = doAudioRouteOrMute(sndDevice);
         mCurSndDevice = sndDevice;
@@ -1724,72 +1755,32 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input)
 status_t AudioHardware::enableFM(int sndDevice)
 {
     LOGD("enableFM");
-/*
-    status_t status = NO_INIT;
-    unsigned short session_id = INVALID_DEVICE;
-    status = ::open(FM_DEVICE, O_RDWR);
-    if (status < 0) {
-           LOGE("Cannot open FM_DEVICE errno: %d", errno);
-           goto Error;
-    }
-    mFmFd = status;
-    if(ioctl(mFmFd, AUDIO_GET_SESSION_ID, &session_id)) {
-           LOGE("AUDIO_GET_SESSION_ID failed*********");
-           goto Error;
-    }
-
-    if(enableDevice(DEVICE_FMRADIO_STEREO_TX, 1)) {
-           LOGE("enableDevice failed for device %d", DEVICE_FMRADIO_STEREO_TX);
-           goto Error;
-    }
-    if(msm_route_stream(PCM_PLAY, session_id, DEV_ID(DEVICE_FMRADIO_STEREO_TX), 1)) {
-           LOGE("msm_route_stream failed");
-           goto Error;
-    }
-    addToTable(session_id,cur_rx,INVALID_DEVICE,FM_RADIO,true);
+    addToTable(0, cur_rx, INVALID_DEVICE, FM_RADIO, true);
     if(sndDevice == mCurSndDevice || mCurSndDevice == INVALID_DEVICE) {
         enableDevice(cur_rx, 1);
-        msm_route_stream(PCM_PLAY,session_id,DEV_ID(cur_rx),1);
+        msm_route_stream(PCM_PLAY, 0, DEV_ID(cur_rx), 1);
     }
-    status = ioctl(mFmFd, AUDIO_START, 0);
-    if (status < 0) {
-            LOGE("Cannot do AUDIO_START");
-            goto Error;
-    }
-    return NO_ERROR;
-    Error:
-    if (mFmFd >= 0) {
-        ::close(mFmFd);
-        mFmFd = -1;
-    }
-*/
+
     return NO_ERROR;
 }
 
 status_t AudioHardware::disableFM()
 {
     LOGD("disableFM");
+
 /*
     Routing_table* temp = NULL;
     temp = getNodeByStreamType(FM_RADIO);
     if(temp == NULL)
         return 0;
-    if (mFmFd >= 0) {
-            ::close(mFmFd);
-            mFmFd = -1;
+    if(msm_route_stream(PCM_PLAY, temp->dec_id, DEV_ID(cur_rx), 0)) {
+        LOGE("msm_route_stream failed");
+        return 0;
     }
-    if(msm_route_stream(PCM_PLAY, temp->dec_id, DEV_ID(DEVICE_FMRADIO_STEREO_TX), 0)) {
-           LOGE("msm_route_stream failed");
-           return 0;
-    }
-    if(!getNodeByStreamType(FM_A2DP)){
-        if(enableDevice(DEVICE_FMRADIO_STEREO_TX, 0)) {
-            LOGE("Disabling device failed for device %d", DEVICE_FMRADIO_STEREO_TX);
-        }
-    }
-    deleteFromTable(FM_RADIO);
-    updateDeviceInfo(cur_rx, cur_tx);
 */
+    deleteFromTable(FM_RADIO);
+    updateDeviceInfo(cur_rx, cur_tx, 0, 0);
+
     return NO_ERROR;
 }
 
@@ -2774,8 +2765,7 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes)
             }
             hw->mLock.unlock();
 */
-        }
-        else{
+        } else {
             hw->mLock.unlock();
             if(ioctl(mFd, AUDIO_GET_SESSION_ID, &dec_id)) {
                 LOGE("AUDIO_GET_SESSION_ID failed*********");

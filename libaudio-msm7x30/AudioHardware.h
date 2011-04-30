@@ -471,7 +471,6 @@ private:
                 AudioSystem::audio_in_acoustics mAcoustics;
                 uint32_t    mDevices;
                 bool        mFirstread;
-                uint32_t	mFmRec;
     };
 
             static const uint32_t inputSamplingRates[];
@@ -493,7 +492,6 @@ private:
             int         mNoiseSuppressionState;
             int         m7xsnddriverfd;
             bool        mDualMicEnabled;
-            int         mFmFd;
 
      friend class AudioStreamInMSM72xx;
             Mutex       mLock;
