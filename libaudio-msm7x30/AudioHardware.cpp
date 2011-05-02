@@ -161,6 +161,7 @@ FM_RADIO
 
 #define DEV_ID(X) device_list[X].dev_id
 void addToTable(int decoder_id,int device_id,int device_id_tx,int stream_type,bool active) {
+    LOGD("addToTable (dec_id %d, dev_rx %d, dev_tx %d, type %d, active %d)", decoder_id, device_id, device_id_tx, stream_type, active);
     Routing_table* temp_ptr;
     Mutex::Autolock lock(mRoutingTableLock);
     temp_ptr = (Routing_table* ) malloc(sizeof(Routing_table));
@@ -266,6 +267,7 @@ void printTable()
     }
 }
 void deleteFromTable(int Stream_type) {
+    LOGD("deleteFromTable, type %d", Stream_type);
     Routing_table *temp_ptr,*temp1;
     Mutex::Autolock lock(mRoutingTableLock);
     temp_ptr = head;
