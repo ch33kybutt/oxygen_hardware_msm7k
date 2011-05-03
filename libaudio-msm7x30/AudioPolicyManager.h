@@ -32,9 +32,11 @@ class AudioPolicyManager: public AudioPolicyManagerBase
 public:
                 AudioPolicyManager(AudioPolicyClientInterface *clientInterface)
                 : AudioPolicyManagerBase(clientInterface) {
+#ifdef WITH_QCOM_LPA
                     mLPADecodeOutput = -1;
                     mLPAMuted = false;
                     mLPAStreamType = AudioSystem::DEFAULT;
+#endif
                 }
 
         virtual ~AudioPolicyManager() {}
@@ -90,11 +92,13 @@ protected:
         virtual uint32_t getDeviceForInputSource(int inputSource);
         // Mute or unmute the stream on the specified output
         void setStreamMute(int stream, bool on, audio_io_handle_t output, int delayMs = 0);
+#ifdef WITH_QCOM_LPA
         audio_io_handle_t mLPADecodeOutput;           // active output handler
         audio_io_handle_t mLPAActiveOuput;           // LPA Output Handler during inactive state
 
         bool    mLPAMuted;
         AudioSystem::stream_type  mLPAStreamType;
         AudioSystem::stream_type  mLPAActiveStreamType;
+#endif
 };
 };

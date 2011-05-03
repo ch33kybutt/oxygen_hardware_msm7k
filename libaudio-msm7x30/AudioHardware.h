@@ -284,7 +284,9 @@ const amrsup_frame_order_type amrsup_122_framing = {
 class AudioHardware : public  AudioHardwareBase
 {
     class AudioStreamOutMSM72xx;
+#ifdef WITH_QCOM_LPA
     class AudioSessionOutMSM7xxx;
+#endif
     class AudioStreamInMSM72xx;
 
 public:
@@ -396,6 +398,7 @@ private:
                 uint32_t    mDevices;
     };
 
+#ifdef WITH_QCOM_LPA
     class AudioSessionOutMSM7xxx : public AudioStreamOut {
     public:
                             AudioSessionOutMSM7xxx();
@@ -428,6 +431,7 @@ private:
                 uint32_t    mDevices;
                 int         mSessionId;
     };
+#endif
 
     class AudioStreamInMSM72xx : public AudioStreamIn {
     public:

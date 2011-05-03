@@ -38,6 +38,7 @@
 #include <media/AudioSystem.h>
 #include <media/AudioRecord.h>
 #include <media/mediarecorder.h>
+
 extern "C" {
 #include <linux/spi_aic3254.h>
 }
@@ -1844,6 +1845,7 @@ uint32_t AudioHardware::getInputSampleRate(uint32_t sampleRate)
 
 // ----------------------------------------------------------------------------
 
+#ifdef WITH_QCOM_LPA
 AudioHardware::AudioSessionOutMSM7xxx::AudioSessionOutMSM7xxx() :
     mHardware(0), mStartCount(0), mRetryCount(0), mStandby(true), mDevices(0), mSessionId(-1)
 {
@@ -1976,6 +1978,7 @@ status_t AudioHardware::AudioSessionOutMSM7xxx::setVolume(float left, float righ
     LOGV("msm_set_volume(%f) succeeded", vol);
     return NO_ERROR;
 }
+#endif
 
 // ----------------------------------------------------------------------------
 
