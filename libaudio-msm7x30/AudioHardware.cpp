@@ -1758,6 +1758,7 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input)
 status_t AudioHardware::enableFM(int sndDevice)
 {
     LOGD("enableFM");
+
     addToTable(0, cur_rx, INVALID_DEVICE, FM_RADIO, true);
     if(sndDevice == mCurSndDevice || mCurSndDevice == INVALID_DEVICE) {
         enableDevice(cur_rx, 1);
@@ -1771,16 +1772,18 @@ status_t AudioHardware::disableFM()
 {
     LOGD("disableFM");
 
-/*
     Routing_table* temp = NULL;
     temp = getNodeByStreamType(FM_RADIO);
+
     if(temp == NULL)
-        return 0;
+        return NO_ERROR;
+
+    LOGD("Deroute FM stream");
     if(msm_route_stream(PCM_PLAY, temp->dec_id, DEV_ID(cur_rx), 0)) {
         LOGE("msm_route_stream failed");
+        deleteFromTable(FM_RADIO);
         return 0;
     }
-*/
     deleteFromTable(FM_RADIO);
     updateDeviceInfo(cur_rx, cur_tx, 0, 0);
 
