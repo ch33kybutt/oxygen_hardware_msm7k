@@ -1483,31 +1483,73 @@ uint32_t AudioHardware::getACDB(int mode, uint32_t device)
     return acdb_id;
 }
 
-status_t AudioHardware::do_aic3254_control(int mode, bool Record, bool Standby, uint32_t Routes)
+status_t AudioHardware::do_aic3254_control(int mode, bool record, bool standby, uint32_t device)
 {
-    LOGD("do_aic3254_control mode: %d Record: %d Standby: %d device: %d", mode, Record, Standby, Routes);
+    LOGD("do_aic3254_control mode: %d record: %d standby: %d device: %d", mode, record, standby, device);
 
-    // Default OFF
     uint32_t new_aic_txmode = UPLINK_OFF;
     uint32_t new_aic_rxmode = DOWNLINK_OFF;
 
-    if (cur_aic_rx == SND_DEVICE_SPEAKER ||
-        cur_aic_rx == SND_DEVICE_HEADSET ||
-        cur_aic_rx == SND_DEVICE_HEADSET_AND_SPEAKER ||
-        cur_aic_rx == SND_DEVICE_FM_SPEAKER) {
+    if (mode == AudioSystem::MODE_IN_CALL) {
+        if (device == SND_DEVICE_HEADSET) {
+            new_aic_rxmode = CALL_DOWNLINK_EMIC_HEADSET;
+            new_aic_txmode = CALL_UPLINK_EMIC_HEADSET;
+        } else if (device == SND_DEVICE_SPEAKER ||
+                   device == SND_DEVICE_SPEAKER_BACK_MIC) {
+            new_aic_rxmode = CALL_DOWNLINK_IMIC_SPEAKER;
+            new_aic_txmode = CALL_UPLINK_IMIC_SPEAKER;
+        } else if (device == SND_DEVICE_HEADSET_AND_SPEAKER ||
+                   device == SND_DEVICE_HEADSET_AND_SPEAKER_BACK_MIC) {
+            new_aic_rxmode = RING_HEADSET_SPEAKER;
+        } else if (device == SND_DEVICE_NO_MIC_HEADSET ||
+                   device == SND_DEVICE_NO_MIC_HEADSET_BACK_MIC) {
+            new_aic_rxmode = CALL_DOWNLINK_IMIC_HEADSET;
+            new_aic_txmode = CALL_UPLINK_IMIC_HEADSET;
+        } else if (device == SND_DEVICE_HANDSET ||
+                   device == SND_DEVICE_HANDSET_BACK_MIC) {
+            new_aic_rxmode = CALL_DOWNLINK_IMIC_RECEIVER;
+            new_aic_txmode = CALL_UPLINK_IMIC_RECEIVER;
+        }
+    } else {
+        if (standby) {
+            if (device == SND_DEVICE_FM_HEADSET) {
+                new_aic_rxmode = FM_OUT_HEADSET;
+                new_aic_txmode = FM_IN_HEADSET;
+            } else if (device == SND_DEVICE_FM_SPEAKER) {
+                new_aic_rxmode = FM_OUT_SPEAKER;
+                new_aic_txmode = FM_IN_SPEAKER;
+            }
+        } else {
+            if (device == SND_DEVICE_HEADSET_AND_SPEAKER ||
+                device == SND_DEVICE_HEADSET_AND_SPEAKER_BACK_MIC) {
+                new_aic_rxmode = RING_HEADSET_SPEAKER;
+            } else if (device == SND_DEVICE_SPEAKER ||
+                       device == SND_DEVICE_SPEAKER_BACK_MIC) {
+                new_aic_rxmode = PLAYBACK_SPEAKER;
+            } else if (device == SND_DEVICE_HANDSET ||
+                       device == SND_DEVICE_HANDSET_BACK_MIC) {
+                new_aic_rxmode = PLAYBACK_RECEIVER;
+            } else if (device == SND_DEVICE_HEADSET ||
+                       device == SND_DEVICE_NO_MIC_HEADSET ||
+                       device == SND_DEVICE_NO_MIC_HEADSET_BACK_MIC) {
+                new_aic_rxmode = PLAYBACK_HEADSET;
+            }
+        }
 
-        switch (mode) {
-        case AudioSystem::MODE_NORMAL:
-            cur_aic_rx = PLAYBACK_SPEAKER;
-            break;
-        case AudioSystem::MODE_RINGTONE:
-            cur_aic_rx = PLAYBACK_SPEAKER;
-            break;
-        case AudioSystem::MODE_IN_CALL:
-            cur_aic_rx = PLAYBACK_SPEAKER;
-            break;
-        default:
-            return 0;
+        if (record) {
+            if (device == SND_DEVICE_HEADSET) {
+                new_aic_txmode = VOICERECORD_EMIC;
+            } else if (device == SND_DEVICE_HANDSET_BACK_MIC ||
+                device == SND_DEVICE_SPEAKER_BACK_MIC ||
+                device == SND_DEVICE_NO_MIC_HEADSET_BACK_MIC ||
+                device == SND_DEVICE_HEADSET_AND_SPEAKER_BACK_MIC) {
+                new_aic_txmode = VIDEORECORD_IMIC;
+            } else if (device == SND_DEVICE_HANDSET ||
+                device == SND_DEVICE_SPEAKER ||
+                device == SND_DEVICE_NO_MIC_HEADSET ||
+                device == SND_DEVICE_HEADSET_AND_SPEAKER) {
+                new_aic_txmode = VOICERECORD_IMIC;
+            }
         }
     }
 
@@ -1516,12 +1558,10 @@ status_t AudioHardware::do_aic3254_control(int mode, bool Record, bool Standby, 
         if (aic3254_ioctl(AIC3254_CONFIG_RX, new_aic_rxmode) >= 0)
             cur_aic_rx = new_aic_rxmode;
 
-/*
     LOGD("aic3254_ioctl: new_aic_txmode %d cur_aic_tx %d", new_aic_txmode, cur_aic_tx);
     if (new_aic_txmode != cur_aic_tx)
         if (aic3254_ioctl(AIC3254_CONFIG_TX, new_aic_txmode) >= 0)
             cur_aic_tx = new_aic_txmode;
-*/
 
     return NO_ERROR;
 }
