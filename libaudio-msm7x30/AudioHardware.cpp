@@ -41,6 +41,7 @@
 
 extern "C" {
 #include <linux/spi_aic3254.h>
+#include <linux/tpa2051d3.h>
 }
 
 #define LOG_SND_RPC 0  // Set to 1 to log sound RPC's
@@ -1090,6 +1091,47 @@ status_t AudioHardware::setMasterVolume(float v)
     return -1;
 }
 
+status_t do_tpa2051_control(int mode)
+{
+    int fd, rc;
+    int tpa_mode = 0;
+
+    if (mode) {
+        if (cur_rx == DEVICE_HEADSET_RX)
+            tpa_mode = TPA2051_MODE_VOICECALL_HEADSET;
+        if (cur_rx == DEVICE_SPEAKER_RX)
+            tpa_mode = TPA2051_MODE_VOICECALL_SPKR;
+    } else {
+        if (cur_rx == DEVICE_FMRADIO_HEADSET_RX)
+            tpa_mode = TPA2051_MODE_FM_HEADSET;
+        if (cur_rx == DEVICE_FMRADIO_SPEAKER_RX)
+            tpa_mode = TPA2051_MODE_FM_SPKR;
+        if (cur_rx == DEVICE_SPEAKER_HEADSET_RX)
+            tpa_mode = TPA2051_MODE_RING;
+        if (cur_rx == DEVICE_HEADSET_RX)
+            tpa_mode = TPA2051_MODE_PLAYBACK_HEADSET;
+        if (cur_rx == DEVICE_SPEAKER_RX)
+            tpa_mode = TPA2051_MODE_PLAYBACK_SPKR;
+    }
+
+    fd = open("/dev/tpa2051d3", O_RDWR);
+    if (fd < 0) {
+        LOGE("can't open /dev/tpa2051d3 %d", fd);
+        return -1;
+    }
+
+    if (tpa_mode) {
+        rc = ioctl(fd, TPA2051_SET_MODE, &tpa_mode);
+        if (rc < 0)
+            LOGE("ioctl TPA2051_SET_MODE failed: %s", strerror(errno));
+        else
+            LOGD("Update TPA2051_SET_MODE to mode %d success", tpa_mode);
+    }
+
+    close(fd);
+    return 0;
+}
+
 static status_t do_route_audio_rpc(uint32_t device,
                                    bool ear_mute, bool mic_mute,
                                    uint32_t rx_acdb_id, uint32_t tx_acdb_id)
@@ -1254,6 +1296,10 @@ static status_t do_route_audio_rpc(uint32_t device,
     else {
         updateDeviceInfo(new_rx_device, new_tx_device, rx_acdb_id, tx_acdb_id);
     }
+
+    if (support_tpa2051)
+        do_tpa2051_control(ear_mute ^1);
+
     return NO_ERROR;
 }
 
@@ -2113,6 +2159,9 @@ ssize_t AudioHardware::AudioStreamOutMSM72xx::write(const void* buffer, size_t b
         // fill 2 buffers before AUDIO_START
         mStartCount = AUDIO_HW_NUM_OUT_BUF;
         mStandby = false;
+
+        if (support_tpa2051)
+            do_tpa2051_control(0);
 
         if (support_aic3254) {
             mHardware->do_aic3254_control(mHardware->get_mMode(),
