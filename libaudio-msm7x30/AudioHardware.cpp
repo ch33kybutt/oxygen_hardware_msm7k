@@ -610,26 +610,30 @@ AudioHardware::AudioHardware() :
 
     set_tpa2051_parameters = (int (*)(void))::dlsym(acoustic, "set_tpa2051_parameters");
     if ((*set_tpa2051_parameters) == 0) {
-        LOGE("Could not open set_tpa2051_parameters()");
-        return;
+        LOGD("set_tpa2051_parameters() not present");
+        support_tpa2051 = false;
     }
 
-    rc = set_tpa2051_parameters();
-    if (rc < 0) {
-        LOGD("Could not set tpa2051 parameters to share memory: %d", rc);
-        support_tpa2051 = false;
+    if (support_tpa2051) {
+        rc = set_tpa2051_parameters();
+        if (rc < 0) {
+            LOGD("Speaker amplifies tpa2051 is not supported");
+            support_tpa2051 = false;
+        }
     }
 
     set_aic3254_parameters = (int (*)(void))::dlsym(acoustic, "set_aic3254_parameters");
     if ((*set_aic3254_parameters) == 0 ) {
-        LOGE("Could not open set_aic3254_parameters()");
-        return;
+        LOGD("set_aic3254_parameters() not present");
+        support_aic3254 = false;
     }
 
-    rc = set_aic3254_parameters();
-    if (rc < 0) {
-        LOGD("Could not set aic3254 parameters to share memory: %d", rc);
-        support_aic3254 = false;
+    if (support_aic3254) {
+        rc = set_aic3254_parameters();
+        if (rc < 0) {
+            LOGD("AIC3254 DSP is not supported");
+            support_aic3254 = false;
+        }
     }
 
     mInit = true;
