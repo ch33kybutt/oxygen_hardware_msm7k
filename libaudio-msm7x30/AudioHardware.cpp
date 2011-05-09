@@ -1303,35 +1303,12 @@ static status_t do_route_audio_rpc(uint32_t device,
     return NO_ERROR;
 }
 
-// always call with mutex held
-/*
-status_t AudioHardware::doAudioRouteOrMute(uint32_t device)
-{
-*/
-// BT acoustics is not supported. This might be used by OEMs. Hence commenting
-// the code and not removing it.
-#if 0
-    if (device == (uint32_t)SND_DEVICE_BT || device == (uint32_t)SND_DEVICE_CARKIT) {
-        if (mBluetoothId) {
-            device = mBluetoothId;
-        } else if (!mBluetoothNrec) {
-            device = SND_DEVICE_BT_EC_OFF;
-        }
-    }
-#endif
-/*
-    LOGV("doAudioRouteOrMute() device %x, mMode %d, mMicMute %d", device, mMode, mMicMute);
-    return do_route_audio_rpc(device,
-                              mMode != AudioSystem::MODE_IN_CALL, mMicMute);
-}
-*/
-
 status_t AudioHardware::doAudioRouteOrMute(uint32_t device)
 {
     uint32_t rx_acdb_id = 0;
     uint32_t tx_acdb_id = 0;
 
-    if (device == (uint32_t)SND_DEVICE_BT) {
+    if (device == SND_DEVICE_BT) {
         if (!mBluetoothNrec) {
             device = SND_DEVICE_BT_EC_OFF;
         }
@@ -1351,7 +1328,7 @@ status_t AudioHardware::doAudioRouteOrMute(uint32_t device)
             /* use default BT entry defined in AudioBTID.csv */
             rx_acdb_id = mBTEndpoints[0].rx;
             tx_acdb_id = mBTEndpoints[0].tx;
-            LOGD("Update ACDB ID to default BT setting\n");
+            LOGD("Update ACDB ID to default BT setting");
         }
     }  else if (device == SND_DEVICE_CARKIT
                 || device == SND_DEVICE_BT_EC_OFF) {
@@ -1384,8 +1361,8 @@ status_t AudioHardware::doAudioRouteOrMute(uint32_t device)
         }
     }
 
-    LOGV("doAudioRouteOrMute: rx acdb %d, tx acdb %d\n", rx_acdb_id, tx_acdb_id);
-    LOGV("doAudioRouteOrMute() device %x, mMode %d, mMicMute %d", device, mMode, mMicMute);
+    LOGV("doAudioRouteOrMute: rx acdb %d, tx acdb %d", rx_acdb_id, tx_acdb_id);
+    LOGV("doAudioRouteOrMute() device %d, mMode %d, mMicMute %d", device, mMode, mMicMute);
 
     return do_route_audio_rpc(device, mMode != AudioSystem::MODE_IN_CALL,
                               mMicMute, rx_acdb_id, tx_acdb_id);
