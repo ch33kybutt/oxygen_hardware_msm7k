@@ -1590,6 +1590,9 @@ status_t AudioHardware::do_aic3254_control(int mode, bool record, bool standby, 
         if (aic3254_ioctl(AIC3254_CONFIG_TX, new_aic_txmode) >= 0)
             cur_aic_tx = new_aic_txmode;
 
+    if (cur_aic_tx == UPLINK_OFF && cur_aic_rx == DOWNLINK_OFF)
+        aic3254_powerdown();
+
     return NO_ERROR;
 }
 
@@ -1640,13 +1643,12 @@ int AudioHardware::aic3254_ioctl(int cmd, const int argc)
     return rc;
 }
 
-int AudioHardware::aic3254_powerdown()
+void AudioHardware::aic3254_powerdown()
 {
     LOGD("aic3254_powerdown");
     int rc = aic3254_ioctl(AIC3254_POWERDOWN, 0);
     if (rc < 0)
         LOGE("aic3254_powerdown failed");
-    return rc;
 }
 
 int AudioHardware::aic3254_set_volume(int volume)
@@ -1808,9 +1810,6 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input)
             }
         }
     }
-
-    if (support_aic3254)
-        aic3254_powerdown();
 
     return ret;
 }
@@ -3089,8 +3088,6 @@ status_t AudioHardware::AudioStreamInMSM72xx::standby()
         LOGV("Disable device");
         deleteFromTable(PCM_REC);
         updateDeviceInfo(cur_rx, cur_tx, 0, 0);
-        if (support_aic3254)
-            mHardware->aic3254_powerdown();
     }//mRecordingSession condition.
     // restore output routing if necessary
     mHardware->clearCurDevice();
