@@ -1015,15 +1015,13 @@ status_t AudioHardware::setVoiceVolume(float v)
 /*
 status_t AudioHardware::setFmVolume(float v)
 {
-    if (v < 0.0) {
-        LOGW("setFmVolume(%f) under 0.0, assuming 0.0\n", v);
-        v = 0.0;
-    } else if (v > 1.0) {
-        LOGW("setFmVolume(%f) over 1.0, assuming 1.0\n", v);
-        v = 1.0;
+    int vol = AudioSystem::logToLinear( v );
+    if ( vol > 100 ) {
+        vol = 100;
     }
-    float vol = v * 100.0;
-    LOGV("setFmVolume(%f)\n", vol);
+    else if ( vol < 0 ) {
+        vol = 0;
+    LOGV("setFmVolume(%f)\n", v);
     Routing_table* temp = NULL;
     temp = getNodeByStreamType(FM_RADIO);
     if(temp == NULL){
@@ -1067,9 +1065,13 @@ static status_t set_volume_fm(uint32_t volume)
 status_t AudioHardware::setFmVolume(float v)
 {
     int vol = AudioSystem::logToLinear(v);
+    if (vol > 100) {
+        vol = 100;
+    } else if (vol < 0) {
+        vol = 0;
+    }
     LOGV("setFmVolume %d", vol);
     set_volume_fm(vol);
-
     return NO_ERROR;
 }
 
