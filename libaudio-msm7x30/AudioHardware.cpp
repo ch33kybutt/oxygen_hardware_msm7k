@@ -1143,22 +1143,22 @@ static status_t do_route_audio_rpc(uint32_t device,
     Routing_table* temp = NULL;
     LOGV("do_route_audio_rpc(%d, %d, %d)", device, ear_mute, mic_mute);
 
-    if(device == SND_DEVICE_HANDSET) {
+    if (device == SND_DEVICE_HANDSET) {
         new_rx_device = DEVICE_HANDSET_RX;
         new_tx_device = DEVICE_HANDSET_TX;
         LOGV("In HANDSET");
     }
-    else if(device == SND_DEVICE_SPEAKER) {
+    else if (device == SND_DEVICE_SPEAKER) {
         new_rx_device = DEVICE_SPEAKER_RX;
         new_tx_device = DEVICE_SPEAKER_TX;
         LOGV("In SPEAKER");
     }
-    else if(device == SND_DEVICE_HEADSET) {
+    else if (device == SND_DEVICE_HEADSET) {
         new_rx_device = DEVICE_HEADSET_RX;
         new_tx_device = DEVICE_HEADSET_TX;
         LOGV("In HEADSET");
     }
-    else if(device == SND_DEVICE_NO_MIC_HEADSET) {
+    else if (device == SND_DEVICE_NO_MIC_HEADSET) {
         new_rx_device = DEVICE_HEADSET_RX;
         new_tx_device = DEVICE_HANDSET_TX;
         LOGV("In NO MIC HEADSET");
@@ -1168,7 +1168,7 @@ static status_t do_route_audio_rpc(uint32_t device,
         new_tx_device = DEVICE_HANDSET_TX;
         LOGV("In FM HANDSET");
     }
-    else if(device == SND_DEVICE_FM_SPEAKER) {
+    else if (device == SND_DEVICE_FM_SPEAKER) {
         new_rx_device = DEVICE_FMRADIO_SPEAKER_RX;
         new_tx_device = DEVICE_HANDSET_TX;
         LOGV("In FM SPEAKER");
@@ -1190,42 +1190,42 @@ static status_t do_route_audio_rpc(uint32_t device,
         LOGV("In DUALMIC_SPEAKER");
     }
 */
-    else if(device == SND_DEVICE_TTY_FULL) {
+    else if (device == SND_DEVICE_TTY_FULL) {
         new_rx_device = DEVICE_TTY_HEADSET_MONO_RX;
         new_tx_device = DEVICE_TTY_HEADSET_MONO_TX;
         LOGV("In TTY_FULL");
     }
-    else if(device == SND_DEVICE_TTY_VCO) {
+    else if (device == SND_DEVICE_TTY_VCO) {
         new_rx_device = DEVICE_TTY_HEADSET_MONO_RX;
         new_tx_device = DEVICE_HANDSET_TX;
         LOGV("In TTY_VCO");
     }
-    else if(device == SND_DEVICE_TTY_HCO) {
+    else if (device == SND_DEVICE_TTY_HCO) {
         new_rx_device = DEVICE_HANDSET_RX;
         new_tx_device = DEVICE_TTY_HEADSET_MONO_TX;
         LOGV("In TTY_HCO");
     }
-    else if(device == SND_DEVICE_BT) {
+    else if ((device == SND_DEVICE_BT) || (device == SND_DEVICE_BT_EC_OFF)) {
         new_rx_device = DEVICE_BT_SCO_RX;
         new_tx_device = DEVICE_BT_SCO_TX;
         LOGV("In BT_HCO");
     }
-    else if(device == SND_DEVICE_HEADSET_AND_SPEAKER) {
+    else if (device == SND_DEVICE_HEADSET_AND_SPEAKER) {
         new_rx_device = DEVICE_SPEAKER_HEADSET_RX;
         new_tx_device = DEVICE_HEADSET_TX;
         LOGV("In DEVICE_SPEAKER_HEADSET_RX and DEVICE_HEADSET_TX");
     }
-    else if(device == SND_DEVICE_HEADPHONE_AND_SPEAKER) {
+    else if (device == SND_DEVICE_HEADPHONE_AND_SPEAKER) {
         new_rx_device = DEVICE_SPEAKER_HEADSET_RX;
         new_tx_device = DEVICE_HANDSET_TX;
         LOGV("In DEVICE_SPEAKER_HEADSET_RX and DEVICE_HANDSET_TX");
     }
-    else if(device == SND_DEVICE_USB_HEADSET) {
+    else if (device == SND_DEVICE_USB_HEADSET) {
         new_rx_device = DEVICE_USB_HEADSET_RX;
         new_tx_device = DEVICE_SPEAKER_TX;
         LOGV("In USB_HEADSET");
     }
-    else if(device == SND_DEVICE_HAC) {
+    else if (device == SND_DEVICE_HAC) {
         new_rx_device = DEVICE_HAC_RX;
         new_tx_device = DEVICE_HANDSET_TX;
         LOGV("In HAC");
