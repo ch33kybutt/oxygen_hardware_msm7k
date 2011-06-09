@@ -580,11 +580,11 @@ void AudioPolicyManager::resumeSession(audio_io_handle_t output, AudioSystem::st
     {
         mLPADecodeOutput = mLPAActiveOuput;
         mLPAStreamType = stream;
-        AudioPolicyManager::startOutput(mLPADecodeOutput, mLPAStreamType);
 
         // Set Volume if the music stream volume is changed in the Pause state of LPA Jagan
         mLPAActiveOuput = -1;
         mLPAActiveStreamType = AudioSystem::DEFAULT;
+        AudioPolicyManager::startOutput(mLPADecodeOutput, mLPAStreamType);
     }
 }
 
@@ -852,6 +852,11 @@ status_t AudioPolicyManager::checkAndSetVolume(int stream, int index, audio_io_h
         (stream == AudioSystem::FM) || force) {
         mOutputs.valueFor(output)->mCurVolume[stream] = volume;
         LOGV("setStreamVolume() for output %d stream %d, volume %f, delay %d", output, stream, volume, delayMs);
+#ifdef WITH_QCOM_LPA
+        if (stream == mLPAActiveStreamType && mLPAActiveOuput > 0 ) {
+            mOutputs.valueFor(mLPAActiveOuput)->mCurVolume[mLPAActiveStreamType] = volume;
+        }
+#endif
         if (stream == AudioSystem::VOICE_CALL ||
             stream == AudioSystem::DTMF ||
             stream == AudioSystem::BLUETOOTH_SCO) {
