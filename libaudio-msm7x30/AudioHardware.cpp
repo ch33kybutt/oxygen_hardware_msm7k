@@ -506,58 +506,59 @@ AudioHardware::AudioHardware() :
 
     name = msm_get_device_list();
     device_list = (Device_table* )malloc(sizeof(Device_table)*DEVICE_COUNT);
-    if(device_list == NULL) {
+    if (device_list == NULL) {
         LOGE("malloc failed for device list");
         return;
     }
-    for(i = 0;i<dev_cnt;i++)
+    for (i = 0;i<dev_cnt;i++)
         device_list[i].dev_id = INVALID_DEVICE;
 
-    for(i = 0; i < dev_cnt;i++) {
-        if(strcmp((char* )name[i],"handset_rx") == 0)
+    for (i = 0; i < dev_cnt;i++) {
+        LOGV("******* name[%d] = [%s] *********", i, (char* )name[i]);
+        if (strcmp((char* )name[i],"handset_rx") == 0)
             index = DEVICE_HANDSET_RX;
-        else if(strcmp((char* )name[i],"handset_tx") == 0)
+        else if (strcmp((char* )name[i],"handset_tx") == 0)
             index = DEVICE_HANDSET_TX;
-        else if(strcmp((char* )name[i],"headset_stereo_rx") == 0)
+        else if (strcmp((char* )name[i],"headset_stereo_rx") == 0)
             index = DEVICE_HEADSET_RX;
-        else if(strcmp((char* )name[i],"headset_mono_rx") == 0)
+        else if (strcmp((char* )name[i],"headset_mono_rx") == 0)
             index = DEVICE_HEADSET_MONO_RX;
-        else if(strcmp((char* )name[i],"headset_mono_tx") == 0)
+        else if (strcmp((char* )name[i],"headset_mono_tx") == 0)
             index = DEVICE_HEADSET_TX;
-        else if(strcmp((char* )name[i],"fmradio_handset_rx") == 0)
+        else if (strcmp((char* )name[i],"fmradio_handset_rx") == 0)
             index = DEVICE_FMRADIO_HANDSET_RX;
-        else if(strcmp((char* )name[i],"speaker_mono_rx") == 0)
+        else if (strcmp((char* )name[i],"speaker_mono_rx") == 0)
             index = DEVICE_SPEAKER_RX;
-        else if(strcmp((char* )name[i],"fmradio_speaker_rx") == 0)
+        else if (strcmp((char* )name[i],"fmradio_speaker_rx") == 0)
             index = DEVICE_FMRADIO_SPEAKER_RX;
-        else if(strcmp((char* )name[i],"fmradio_headset_rx") == 0)
+        else if (strcmp((char* )name[i],"fmradio_headset_rx") == 0)
             index = DEVICE_FMRADIO_HEADSET_RX;
-        else if(strcmp((char* )name[i],"tty_headset_mono_tx") == 0)
+        else if (strcmp((char* )name[i],"tty_headset_mono_tx") == 0)
             index = DEVICE_TTY_HEADSET_MONO_TX;
-        else if(strcmp((char* )name[i],"tty_headset_mono_rx") == 0)
+        else if (strcmp((char* )name[i],"tty_headset_mono_rx") == 0)
             index = DEVICE_TTY_HEADSET_MONO_RX;
-        else if(strcmp((char* )name[i],"speaker_mono_tx") == 0)
+        else if (strcmp((char* )name[i],"speaker_mono_tx") == 0)
             index = DEVICE_SPEAKER_TX;
-        else if(strcmp((char*)name[i],"headset_speaker_stereo_rx") == 0)
+        else if (strcmp((char*)name[i],"headset_speaker_stereo_rx") == 0)
             index = DEVICE_SPEAKER_HEADSET_RX;
-        else if(strcmp((char*)name[i],"usb_headset_stereo_rx") == 0)
+        else if (strcmp((char*)name[i],"usb_headset_stereo_rx") == 0)
             index = DEVICE_USB_HEADSET_RX;
-        else if(strcmp((char*)name[i],"hac_mono_rx") == 0)
+        else if (strcmp((char*)name[i],"hac_mono_rx") == 0)
             index = DEVICE_HAC_RX;
-        else if(strcmp((char*)name[i],"alt_mono_rx") == 0)
+        else if (strcmp((char*)name[i],"alt_mono_rx") == 0)
             index = DEVICE_ALT_RX;
-        else if(strcmp((char*)name[i],"handset_vr_tx") == 0)
+        else if (strcmp((char*)name[i],"handset_vr_tx") == 0)
             index = DEVICE_VR_HANDSET;
-        else if(strcmp((char* )name[i],"bt_sco_rx") == 0)
+        else if (strcmp((char* )name[i],"bt_sco_rx") == 0)
             index = DEVICE_BT_SCO_RX;
-        else if(strcmp((char* )name[i],"bt_sco_tx") == 0)
+        else if (strcmp((char* )name[i],"bt_sco_tx") == 0)
             index = DEVICE_BT_SCO_TX;
-        else
+        else 
             continue;
-        LOGV("index = %d",index);
+        LOGV("index = %d", index);
 
         device_list[index].dev_id = msm_get_device((char* )name[i]);
-        if(device_list[index].dev_id >= 0) {
+        if (device_list[index].dev_id >= 0) {
             LOGV("Found device: %s:index = %d,dev_id: %d",( char* )name[i], index,device_list[index].dev_id);
         }
         device_list[index].class_id = msm_get_device_class(device_list[index].dev_id);
