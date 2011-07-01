@@ -37,6 +37,10 @@ ifeq ($(BOARD_USE_QCOM_PMEM),true)
   LOCAL_CFLAGS += -DUSE_QCOM_PMEM
 endif
 
+ifeq ($(BOARD_USE_FRAMEBUFFER_ALPHA_CHANNEL),true)
+  LOCAL_CFLAGS += -DUSE_FRAMEBUFFER_ALPHA_CHANNEL
+endif
+
 include $(BUILD_SHARED_LIBRARY)
 
 # Build a host library for testing
