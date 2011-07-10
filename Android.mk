@@ -33,11 +33,14 @@ common_msm_dirs := libcopybit liblights libopencorehw $(LIBRPC) libstagefrighthw
 msm7k_dirs := $(common_msm_dirs) boot libgralloc $(LIBAUDIO)
 msm7k_adreno_dirs := $(common_msm_dirs) boot libgralloc-qsd8k $(LIBAUDIO)
 qsd8k_dirs := $(common_msm_dirs) libgralloc-qsd8k libaudio-qsd8k dspcrashd
-ifeq ($(BOARD_PREBUILT_LIBAUDIO),true)
-    msm7x30_dirs := liblights libgralloc-qsd8k $(LIBRPC) libaudio-qdsp5v2 liboverlay
-else
-    msm7x30_dirs := liblights libgralloc-qsd8k $(LIBRPC) libaudio-msm7x30 liboverlay
+ifeq ($(LIBAUDIO),libaudio)
+    ifeq ($(BOARD_PREBUILT_LIBAUDIO),true)
+        LIBAUDIO := libaudio-qdsp5v2
+    else
+        LIBAUDIO := libaudio-msm7x30
+    endif
 endif
+msm7x30_dirs := liblights libgralloc-qsd8k $(LIBRPC) $(LIBAUDIO) liboverlay
 
 ifeq ($(TARGET_BOARD_PLATFORM),qsd8k)
     ### QSD8k
