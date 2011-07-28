@@ -1094,10 +1094,43 @@ status_t AudioHardware::setMasterVolume(float v)
     return -1;
 }
 
+status_t get_batt_temp(int *batt_temp)
+{
+    LOGD("Enable ALT for speaker");
+
+    int i, fd, len;
+    char get_batt_temp[6] = { 0 };
+    const char *fn[] = {
+         "/sys/devices/platform/rs30100001:00000000.0/power_supply/battery/batt_temp",
+         "/sys/devices/platform/rs30100001:00000000/power_supply/battery/batt_temp" };
+
+    for (i=0; i<2; i++) {
+       if ((fd = open(fn[i], O_RDONLY)) >= 0)
+           break;
+    }
+    if (fd <= 0) {
+       LOGE("Couldn't open sysfs file batt_temp");
+       return UNKNOWN_ERROR;
+    }
+
+    if ((len = read(fd, get_batt_temp, sizeof(get_batt_temp))) <= 1) {
+        LOGE("read battery temp fail: %s\n", strerror(errno));
+        close(fd);
+        return BAD_VALUE;
+    }
+
+    *batt_temp = strtol(get_batt_temp, NULL, 10);
+    LOGD("ALT batt_temp = %d", *batt_temp);
+
+    close(fd);
+    return NO_ERROR;
+}
+
 status_t do_tpa2051_control(int mode)
 {
     int fd, rc;
     int tpa_mode = 0;
+    int batt_temp = 0;
 
     if (mode) {
         if (cur_rx == DEVICE_HEADSET_RX)
@@ -1128,7 +1161,20 @@ status_t do_tpa2051_control(int mode)
         if (rc < 0)
             LOGE("ioctl TPA2051_SET_MODE failed: %s", strerror(errno));
         else
-            LOGD("Update TPA2051_SET_MODE to mode %d success", tpa_mode);
+            LOGD("update TPA2051_SET_MODE to mode %d success", tpa_mode);
+    }
+
+    if (alt_enable && cur_rx == DEVICE_SPEAKER_RX) {
+        if (get_batt_temp(&batt_temp) == NO_ERROR) {
+            if (batt_temp < 50) {
+                tpa_mode = 629276672;
+                rc = ioctl(fd, TPA2051_SET_CONFIG, &tpa_mode);
+                if (rc < 0)
+                    LOGE("ioctl TPA2051_SET_CONFIG failed: %s", strerror(errno));
+                else
+                    LOGD("update TPA2051_SET_CONFIG to mode %d success", tpa_mode);
+            }
+        }
     }
 
     close(fd);
@@ -1387,30 +1433,6 @@ status_t AudioHardware::get_mRecordState(void)
     return mRecordState;
 }
 
-status_t AudioHardware::get_batt_temp(int *batt_temp)
-{
-    int fd, len;
-    const char *fn =
-            "/sys/devices/platform/rs30100001:00000000/power_supply/battery/batt_temp";
-
-    char get_batt_temp[6] = { 0 };
-
-    if ((fd = open(fn, O_RDONLY)) < 0) {
-        LOGE("%s: cannot open %s: %s\n", __FUNCTION__, fn, strerror(errno));
-        return UNKNOWN_ERROR;
-    }
-
-    if ((len = read(fd, get_batt_temp, sizeof(get_batt_temp))) <= 1) {
-        LOGE("read battery temp fail: %s\n", strerror(errno));
-        close(fd);
-        return BAD_VALUE;
-    }
-
-    *batt_temp = strtol(get_batt_temp, NULL, 10);
-    close(fd);
-    return NO_ERROR;
-}
-
 status_t AudioHardware::get_snd_dev(void)
 {
     Mutex::Autolock lock(mLock);
@@ -1468,12 +1490,10 @@ uint32_t AudioHardware::getACDB(int mode, uint32_t device)
                 case SND_DEVICE_FM_SPEAKER:
                 case SND_DEVICE_SPEAKER_BACK_MIC:
                     acdb_id = ACDB_ID_SPKR_PLAYBACK;
-                    if(alt_enable) {
-                        LOGD("Enable ALT for speaker\n");
+                    if (alt_enable) {
                         if (get_batt_temp(&batt_temp) == NO_ERROR) {
                             if (batt_temp < 50)
                                 acdb_id = ACDB_ID_ALT_SPKR_PLAYBACK;
-                            LOGD("ALT batt temp = %d\n", batt_temp);
                         }
                     }
                     break;
