@@ -354,8 +354,8 @@ private:
     status_t    get_snd_dev();
     status_t    doRouting(AudioStreamInMSM72xx *input);
     uint32_t    getACDB(int mode, uint32_t device);
-    status_t    do_aic3254_control(int mode, bool record, bool standby, uint32_t device);
-    void        aic3254_config(uint32_t Routes, const char* aic_effect);
+    status_t    do_aic3254_control(uint32_t device);
+    void        aic3254_config(uint32_t device, const char* active_ap, const char* aic_effect);
     int         aic3254_ioctl(int cmd, const int argc);
     void        aic3254_powerdown();
     int         aic3254_set_volume(int volume);
@@ -477,7 +477,6 @@ private:
     };
 
             static const uint32_t inputSamplingRates[];
-            bool        mRecordState;
             bool        mInit;
             bool        mMicMute;
             bool        mBluetoothNrec;
@@ -493,8 +492,11 @@ private:
             uint32_t    mVoiceVolume;
             int         mTtyMode;
             int         mNoiseSuppressionState;
-            int         m7xsnddriverfd;
             bool        mDualMicEnabled;
+            bool        mRecordState;
+            char        mCurDspProfile[18];
+            bool        mEffectEnabled;
+            char        mActiveAP[8];
 
      friend class AudioStreamInMSM72xx;
             Mutex       mLock;
