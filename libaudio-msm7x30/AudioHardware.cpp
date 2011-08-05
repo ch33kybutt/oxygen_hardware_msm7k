@@ -1662,12 +1662,12 @@ void AudioHardware::aic3254_config(uint32_t device, const char* active_ap, const
     if (mMode == AudioSystem::MODE_IN_CALL) {
         strcpy(base, "Original_Phone");
         if ( device == SND_DEVICE_HANDSET ||
-             device == SND_DEVICE_HANDSET_BACK_MIC ||
-             device == SND_DEVICE_NO_MIC_HEADSET )
+             device == SND_DEVICE_HANDSET_BACK_MIC)
             strcat(base, "_REC");
         else if (device == SND_DEVICE_HEADSET ||
              device == SND_DEVICE_HEADSET_AND_SPEAKER ||
-             device == SND_DEVICE_HEADSET_AND_SPEAKER_BACK_MIC)
+             device == SND_DEVICE_HEADSET_AND_SPEAKER_BACK_MIC ||
+             device == SND_DEVICE_NO_MIC_HEADSET)
             strcat(base, "_HP");
         else if (device == SND_DEVICE_SPEAKER)
             strcat(base, "_SPK");
