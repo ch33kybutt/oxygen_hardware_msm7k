@@ -1,5 +1,7 @@
 /*
-** Copyright 2008, The Android Open-Source Project
+** Copyright (c) 2009, The Android Open-Source Project
+** Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
+** Copyright (c) 2011, The CyanogenMod Project
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -38,54 +40,27 @@ namespace android {
 
 // ----------------------------------------------------------------------------
 // Kernel driver interface
-//
-
-#define EQ_MAX_BAND_NUM 12
-
-#define ADRC_ENABLE  0x0001
-#define ADRC_DISABLE 0x0000
-#define EQ_ENABLE    0x0002
-#define EQ_DISABLE   0x0000
-#define RX_IIR_ENABLE   0x0004
-#define RX_IIR_DISABLE  0x0000
 
 #define MOD_PLAY 1
 #define MOD_REC  2
 #define MOD_TX   3
 #define MOD_RX   4
 
-#define ACDB_ID_HAC_HANDSET_MIC 107
-#define ACDB_ID_HAC_HANDSET_SPKR 207
-#define ACDB_ID_EXT_MIC_REC 307
-#define ACDB_ID_HEADSET_PLAYBACK 407
+#define ACDB_ID_HAC_HANDSET_MIC           107
+#define ACDB_ID_HAC_HANDSET_SPKR          207
+#define ACDB_ID_EXT_MIC_REC               307
+#define ACDB_ID_HEADSET_PLAYBACK          407
 #define ACDB_ID_HEADSET_RINGTONE_PLAYBACK 408
-#define ACDB_ID_INT_MIC_REC 507
-#define ACDB_ID_CAMCORDER   508
-#define ACDB_ID_INT_MIC_VR  509
-#define ACDB_ID_SPKR_PLAYBACK 607
-#define ACDB_ID_ALT_SPKR_PLAYBACK 608
+#define ACDB_ID_INT_MIC_REC               507
+#define ACDB_ID_CAMCORDER                 508
+#define ACDB_ID_INT_MIC_VR                509
+#define ACDB_ID_SPKR_PLAYBACK             607
+#define ACDB_ID_ALT_SPKR_PLAYBACK         608
 
 struct msm_bt_endpoint {
     int tx;
     int rx;
     char name[64];
-};
-
-struct eq_filter_type {
-    int16_t gain;
-    uint16_t freq;
-    uint16_t type;
-    uint16_t qf;
-};
-
-struct eqalizer {
-    uint16_t bands;
-    uint16_t params[132];
-};
-
-struct rx_iir_filter {
-    uint16_t num_bands;
-    uint16_t iir_params[48];
 };
 
 struct msm_audio_config {
@@ -97,64 +72,58 @@ struct msm_audio_config {
     uint32_t unused[3];
 };
 
-struct msm_audio_stats {
-    uint32_t out_bytes;
-    uint32_t unused[3];
-};
-
 enum tty_modes {
-    TTY_OFF = 0,
-    TTY_VCO = 1,
-    TTY_HCO = 2,
+    TTY_OFF  = 0,
+    TTY_VCO  = 1,
+    TTY_HCO  = 2,
     TTY_FULL = 3
 };
 
-#define CODEC_TYPE_PCM 0
-#define AUDIO_HW_NUM_OUT_BUF 2  // Number of buffers in audio driver for output
-// TODO: determine actual audio DSP and hardware latency
-#define AUDIO_HW_OUT_LATENCY_MS 0  // Additionnal latency introduced by audio DSP and hardware in ms
+#define CODEC_TYPE_PCM          0
+#define AUDIO_HW_NUM_OUT_BUF    2    /* Number of buffers in audio driver for output */
+/* TODO: determine actual audio DSP and hardware latency */
+#define AUDIO_HW_OUT_LATENCY_MS 0    /* Additionnal latency introduced by audio DSP and hardware in ms */
 
-#define AUDIO_HW_IN_SAMPLERATE 8000                 // Default audio input sample rate
-#define AUDIO_HW_IN_CHANNELS (AudioSystem::CHANNEL_IN_MONO) // Default audio input channel mask
-#define AUDIO_HW_IN_BUFFERSIZE 2048                 // Default audio input buffer size
-#define AUDIO_HW_IN_FORMAT (AudioSystem::PCM_16_BIT)  // Default audio input sample format
+#define AUDIO_HW_IN_SAMPLERATE  8000 /* Default audio input sample rate */
+#define AUDIO_HW_IN_CHANNELS    (AudioSystem::CHANNEL_IN_MONO) // Default audio input channel mask */
+#define AUDIO_HW_IN_BUFFERSIZE  2048 /* Default audio input buffer size */
+#define AUDIO_HW_IN_FORMAT      (AudioSystem::PCM_16_BIT) // Default audio input sample format */
 
-#define VOICE_VOLUME_MAX 100  // Maximum voice volume
+#define VOICE_VOLUME_MAX        100  /* Maximum voice volume */
 
 #ifdef WITH_QCOM_SPEECH
 /* AMR frame type definitions */
 typedef enum {
-  AMRSUP_SPEECH_GOOD,          /* Good speech frame              */
-  AMRSUP_SPEECH_DEGRADED,      /* Speech degraded                */
-  AMRSUP_ONSET,                /* onset                          */
-  AMRSUP_SPEECH_BAD,           /* Corrupt speech frame (bad CRC) */
-  AMRSUP_SID_FIRST,            /* First silence descriptor       */
-  AMRSUP_SID_UPDATE,           /* Comfort noise frame            */
-  AMRSUP_SID_BAD,              /* Corrupt SID frame (bad CRC)    */
-  AMRSUP_NO_DATA,              /* Nothing to transmit            */
-  AMRSUP_SPEECH_LOST,          /* Lost speech in downlink        */
-  AMRSUP_FRAME_TYPE_MAX
+    AMRSUP_SPEECH_GOOD,          /* Good speech frame              */
+    AMRSUP_SPEECH_DEGRADED,      /* Speech degraded                */
+    AMRSUP_ONSET,                /* onset                          */
+    AMRSUP_SPEECH_BAD,           /* Corrupt speech frame (bad CRC) */
+    AMRSUP_SID_FIRST,            /* First silence descriptor       */
+    AMRSUP_SID_UPDATE,           /* Comfort noise frame            */
+    AMRSUP_SID_BAD,              /* Corrupt SID frame (bad CRC)    */
+    AMRSUP_NO_DATA,              /* Nothing to transmit            */
+    AMRSUP_SPEECH_LOST,          /* Lost speech in downlink        */
+    AMRSUP_FRAME_TYPE_MAX
 } amrsup_frame_type;
 
 /* AMR frame mode (frame rate) definitions */
 typedef enum {
-  AMRSUP_MODE_0475,    /* 4.75 kbit /s */
-  AMRSUP_MODE_0515,    /* 5.15 kbit /s */
-  AMRSUP_MODE_0590,    /* 5.90 kbit /s */
-  AMRSUP_MODE_0670,    /* 6.70 kbit /s */
-  AMRSUP_MODE_0740,    /* 7.40 kbit /s */
-  AMRSUP_MODE_0795,    /* 7.95 kbit /s */
-  AMRSUP_MODE_1020,    /* 10.2 kbit /s */
-  AMRSUP_MODE_1220,    /* 12.2 kbit /s */
-  AMRSUP_MODE_MAX
+    AMRSUP_MODE_0475,    /* 4.75 kbit /s */
+    AMRSUP_MODE_0515,    /* 5.15 kbit /s */
+    AMRSUP_MODE_0590,    /* 5.90 kbit /s */
+    AMRSUP_MODE_0670,    /* 6.70 kbit /s */
+    AMRSUP_MODE_0740,    /* 7.40 kbit /s */
+    AMRSUP_MODE_0795,    /* 7.95 kbit /s */
+    AMRSUP_MODE_1020,    /* 10.2 kbit /s */
+    AMRSUP_MODE_1220,    /* 12.2 kbit /s */
+    AMRSUP_MODE_MAX
 } amrsup_mode_type;
 
-/* The AMR classes
-*/
+/* The AMR classes */
 typedef enum  {
-  AMRSUP_CLASS_A,
-  AMRSUP_CLASS_B,
-  AMRSUP_CLASS_C
+    AMRSUP_CLASS_A,
+    AMRSUP_CLASS_B,
+    AMRSUP_CLASS_C
 } amrsup_class_type;
 
 /* The maximum number of bits in each class */
@@ -171,41 +140,40 @@ typedef enum  {
 #define AMRSUP_CLASS_B_BYTES ((AMRSUP_CLASS_B_MAX + 7) / 8)
 #define AMRSUP_CLASS_C_BYTES ((AMRSUP_CLASS_C_MAX + 7) / 8)
 
-
 /* Number of bytes for an AMR IF2 frame */
 #define AMRSUP_IF2_FRAME_BYTES 32
 
 /* Frame types for 4-bit frame type as in 3GPP TS 26.101 v3.2.0, Sec.4.1.1 */
 typedef enum {
-  AMRSUP_FRAME_TYPE_INDEX_0475    = 0,    /* 4.75 kbit /s    */
-  AMRSUP_FRAME_TYPE_INDEX_0515    = 1,    /* 5.15 kbit /s    */
-  AMRSUP_FRAME_TYPE_INDEX_0590    = 2,    /* 5.90 kbit /s    */
-  AMRSUP_FRAME_TYPE_INDEX_0670    = 3,    /* 6.70 kbit /s    */
-  AMRSUP_FRAME_TYPE_INDEX_0740    = 4,    /* 7.40 kbit /s    */
-  AMRSUP_FRAME_TYPE_INDEX_0795    = 5,    /* 7.95 kbit /s    */
-  AMRSUP_FRAME_TYPE_INDEX_1020    = 6,    /* 10.2 kbit /s    */
-  AMRSUP_FRAME_TYPE_INDEX_1220    = 7,    /* 12.2 kbit /s    */
-  AMRSUP_FRAME_TYPE_INDEX_AMR_SID = 8,    /* SID frame       */
-/* Frame types 9-11 are not supported */
-  AMRSUP_FRAME_TYPE_INDEX_NO_DATA = 15,   /* No data         */
-  AMRSUP_FRAME_TYPE_INDEX_MAX,
-  AMRSUP_FRAME_TYPE_INDEX_UNDEF = AMRSUP_FRAME_TYPE_INDEX_MAX
+    AMRSUP_FRAME_TYPE_INDEX_0475    = 0,    /* 4.75 kbit /s    */
+    AMRSUP_FRAME_TYPE_INDEX_0515    = 1,    /* 5.15 kbit /s    */
+    AMRSUP_FRAME_TYPE_INDEX_0590    = 2,    /* 5.90 kbit /s    */
+    AMRSUP_FRAME_TYPE_INDEX_0670    = 3,    /* 6.70 kbit /s    */
+    AMRSUP_FRAME_TYPE_INDEX_0740    = 4,    /* 7.40 kbit /s    */
+    AMRSUP_FRAME_TYPE_INDEX_0795    = 5,    /* 7.95 kbit /s    */
+    AMRSUP_FRAME_TYPE_INDEX_1020    = 6,    /* 10.2 kbit /s    */
+    AMRSUP_FRAME_TYPE_INDEX_1220    = 7,    /* 12.2 kbit /s    */
+    AMRSUP_FRAME_TYPE_INDEX_AMR_SID = 8,    /* SID frame       */
+    /* Frame types 9-11 are not supported */
+    AMRSUP_FRAME_TYPE_INDEX_NO_DATA = 15,   /* No data         */
+    AMRSUP_FRAME_TYPE_INDEX_MAX,
+    AMRSUP_FRAME_TYPE_INDEX_UNDEF = AMRSUP_FRAME_TYPE_INDEX_MAX
 } amrsup_frame_type_index_type;
 
 #define AMRSUP_FRAME_TYPE_INDEX_MASK         0x0F /* All frame types */
 #define AMRSUP_FRAME_TYPE_INDEX_SPEECH_MASK  0x07 /* Speech frame    */
 
 typedef enum {
-  AMRSUP_CODEC_AMR_NB,
-  AMRSUP_CODEC_AMR_WB,
-  AMRSUP_CODEC_MAX
+    AMRSUP_CODEC_AMR_NB,
+    AMRSUP_CODEC_AMR_WB,
+    AMRSUP_CODEC_MAX
 } amrsup_codec_type;
 
 /* IF1-encoded frame info */
 typedef struct {
-  amrsup_frame_type_index_type frame_type_index;
-  unsigned char fqi;    /* frame quality indicator: TRUE: good frame, FALSE: bad */
-  amrsup_codec_type amr_type;   /* AMR-NB or AMR-WB */
+    amrsup_frame_type_index_type frame_type_index;
+    unsigned char fqi;    /* frame quality indicator: TRUE: good frame, FALSE: bad */
+    amrsup_codec_type amr_type;   /* AMR-NB or AMR-WB */
 } amrsup_if1_frame_info_type;
 
 #define AUDFADEC_AMR_FRAME_TYPE_MASK     0x78
@@ -221,12 +189,12 @@ typedef struct {
 #define AMR_CLASS_C_BITS_122  60
 
 typedef struct {
-  int   len_a;
-  unsigned short *class_a;
-  int   len_b;
-  unsigned short *class_b;
-  int   len_c;
-  unsigned short *class_c;
+    int   len_a;
+    unsigned short *class_a;
+    int   len_b;
+    unsigned short *class_b;
+    int   len_c;
+    unsigned short *class_c;
 } amrsup_frame_order_type;
 
 /* ======================== 12.2 kbps mode ========================== */
@@ -269,12 +237,12 @@ const unsigned short amrsup_bit_order_122_c[AMR_CLASS_C_BITS_122] = {
 
 
 const amrsup_frame_order_type amrsup_122_framing = {
-  AMR_CLASS_A_BITS_122,
-  (unsigned short *) amrsup_bit_order_122_a,
-  AMR_CLASS_B_BITS_122,
-  (unsigned short *) amrsup_bit_order_122_b,
-  AMR_CLASS_C_BITS_122,
-  (unsigned short *) amrsup_bit_order_122_c
+    AMR_CLASS_A_BITS_122,
+    (unsigned short *) amrsup_bit_order_122_a,
+    AMR_CLASS_B_BITS_122,
+    (unsigned short *) amrsup_bit_order_122_b,
+    AMR_CLASS_C_BITS_122,
+    (unsigned short *) amrsup_bit_order_122_c
 };
 #endif
 
@@ -300,14 +268,13 @@ public:
 
     virtual status_t    setMode(int mode);
 
-    // mic mute
     virtual status_t    setMicMute(bool state);
     virtual status_t    getMicMute(bool* state);
 
     virtual status_t    setParameters(const String8& keyValuePairs);
     virtual String8     getParameters(const String8& keys);
 
-    // create I/O streams
+    /* create I/O streams */
     virtual AudioStreamOut* openOutputStream(
                                 uint32_t devices,
                                 int *format=0,
@@ -359,7 +326,7 @@ private:
     int         aic3254_ioctl(int cmd, const int argc);
     void        aic3254_powerdown();
     int         aic3254_set_volume(int volume);
-    status_t    enableFM(int sndDevice);
+    status_t    enableFM(uint32_t sndDevice);
     status_t    disableFM();
     AudioStreamInMSM72xx*   getActiveInput_l();
 
@@ -373,7 +340,7 @@ private:
                                 uint32_t *pChannels,
                                 uint32_t *pRate);
         virtual uint32_t    sampleRate() const { return 44100; }
-        // must be 32-bit aligned - driver only seems to like 4800
+        /* must be 32-bit aligned - driver only seems to like 4800 */
         virtual size_t      bufferSize() const { return 4800; }
         virtual uint32_t    channels() const { return AudioSystem::CHANNEL_OUT_STEREO; }
         virtual int         format() const { return AudioSystem::PCM_16_BIT; }
@@ -407,7 +374,7 @@ private:
                                 int *pFormat,
                                 int32_t sessionId);
         virtual uint32_t    sampleRate() const { return 44100; }
-        // must be 32-bit aligned - driver only seems to like 4800
+        /* must be 32-bit aligned - driver only seems to like 4800 */
         virtual size_t      bufferSize() const { return 4800; }
         virtual uint32_t    channels() const { return AudioSystem::CHANNEL_OUT_STEREO; }
         virtual int         format() const { return AudioSystem::MP3; }

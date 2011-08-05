@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2009 The Android Open Source Project
- * Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2009, The Android Open-Source Project
+ * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2011, The CyanogenMod Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,14 +16,12 @@
  * limitations under the License.
  */
 
-
 #include <stdint.h>
 #include <sys/types.h>
 #include <utils/Timers.h>
 #include <utils/Errors.h>
 #include <utils/KeyedVector.h>
 #include <hardware_legacy/AudioPolicyManagerBase.h>
-
 
 namespace android {
 
@@ -75,7 +74,6 @@ public:
                                     AudioSystem::stream_type stream,
                                     int session = 0);
         virtual void setForceUse(AudioSystem::force_use usage, AudioSystem::forced_config config);
-        status_t startInput(audio_io_handle_t input);
 
 protected:
         // true is current platform implements a back microphone
