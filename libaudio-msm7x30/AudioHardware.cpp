@@ -1479,6 +1479,7 @@ uint32_t AudioHardware::getACDB(int mode, uint32_t device) {
                     break;
                 case SND_DEVICE_HEADSET_AND_SPEAKER:
                 case SND_DEVICE_HEADSET_AND_SPEAKER_BACK_MIC:
+                case SND_DEVICE_HEADPHONE_AND_SPEAKER:
                     acdb_id = ACDB_ID_HEADSET_RINGTONE_PLAYBACK;
                     break;
                 default:
@@ -1560,6 +1561,7 @@ status_t AudioHardware::do_aic3254_control(uint32_t device) {
             switch (device) {
                 case SND_DEVICE_HEADSET_AND_SPEAKER:
                 case SND_DEVICE_HEADSET_AND_SPEAKER_BACK_MIC:
+                case SND_DEVICE_HEADPHONE_AND_SPEAKER:
                     new_aic_rxmode = RING_HEADSET_SPEAKER;
                     break;
                 case SND_DEVICE_SPEAKER:
