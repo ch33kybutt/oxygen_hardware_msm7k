@@ -47,6 +47,10 @@ ifeq ($(BOARD_USES_QCOM_LPA),true)
   LOCAL_CFLAGS += -DWITH_QCOM_LPA
 endif
 
+ifeq ($(TARGET_BOOTLOADER_BOARD_NAME),spade)
+  LOCAL_CFLAGS += -DWITH_SPADE_DSP_PROFILE
+endif
+
 ifeq ($TARGET_OS)-$(TARGET_SIMULATOR),linux-true)
 LOCAL_LDLIBS += -ldl
 endif

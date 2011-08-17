@@ -122,6 +122,7 @@ static const uint32_t DEVICE_COUNT = DEVICE_BT_SCO_TX +1;
 
 static bool support_aic3254 = true;
 static bool support_tpa2051 = true;
+static bool support_backmic = true;
 static int alt_enable = 0;
 static int hac_enable = 0;
 static uint32_t cur_aic_tx = 0;
@@ -460,6 +461,7 @@ AudioHardware::AudioHardware() :
     int (*set_acoustic_parameters)();
     int (*set_tpa2051_parameters)();
     int (*set_aic3254_parameters)();
+    int (*support_back_mic)();
 
     struct msm_bt_endpoint *ept;
 
@@ -609,8 +611,7 @@ AudioHardware::AudioHardware() :
     }
 
     if (support_tpa2051) {
-        rc = set_tpa2051_parameters();
-        if (rc < 0) {
+        if (set_tpa2051_parameters() < 0) {
             LOGD("Speaker amplifies tpa2051 is not supported");
             support_tpa2051 = false;
         }
@@ -623,10 +624,22 @@ AudioHardware::AudioHardware() :
     }
 
     if (support_aic3254) {
-        rc = set_aic3254_parameters();
-        if (rc < 0) {
+        if (set_aic3254_parameters() < 0) {
             LOGD("AIC3254 DSP is not supported");
             support_aic3254 = false;
+        }
+    }
+
+    support_back_mic = (int (*)(void))::dlsym(acoustic, "support_back_mic");
+    if ((*support_back_mic) == 0 ) {
+        LOGD("support_back_mic() not present");
+            support_backmic = false;
+    }
+
+    if (support_backmic) {
+        if (support_back_mic() <= 0) {
+            LOGD("DualMic is not supported");
+            support_backmic = false;
         }
     }
 
@@ -1629,6 +1642,28 @@ void AudioHardware::aic3254_config(uint32_t device, const char* active_ap,
     char aap[8] = "\0";
 
     if (mMode == AudioSystem::MODE_IN_CALL) {
+#ifdef WITH_SPADE_DSP_PROFILE
+        if (support_backmic) {
+            strcpy(base, "DualMic_Phone");
+            switch (device) {
+                case SND_DEVICE_HANDSET:
+                case SND_DEVICE_HANDSET_BACK_MIC:
+                case SND_DEVICE_HEADSET:
+                case SND_DEVICE_HEADSET_AND_SPEAKER:
+                case SND_DEVICE_HEADSET_AND_SPEAKER_BACK_MIC:
+                case SND_DEVICE_NO_MIC_HEADSET:
+                    strcat(base, "_EP");
+                    break;
+                case SND_DEVICE_SPEAKER:
+                    strcat(base, "_SPK");
+                    break;
+                default:
+                    break;
+            }
+        } else {
+            strcpy(base, "Original_Phone");
+        }
+#else
         strcpy(base, "Original_Phone");
         switch (device) {
             case SND_DEVICE_HANDSET:
@@ -1647,9 +1682,14 @@ void AudioHardware::aic3254_config(uint32_t device, const char* active_ap,
             default:
                 break;
         }
+#endif
     } else {
         if (mRecordState)
+#ifdef WITH_SPADE_DSP_PROFILE
+            strcpy(base, "Original");
+#else
             strcpy(base, "Recording");
+#endif
         else if (strlen(aic_effect) == 0 && !mEffectEnabled)
             strcpy(base, "Original");
         else {
