@@ -862,7 +862,21 @@ status_t AudioHardware::setParameters(const String8& keyValuePairs) {
 
     key = String8(BT_NAME_KEY);
     if (param.get(key, value) == NO_ERROR) {
-       doRouting(NULL);
+        mBluetoothIdTx = 0;
+        mBluetoothIdRx = 0;
+        for (int i = 0; i < mNumBTEndpoints; i++) {
+            if (!strcasecmp(value.string(), mBTEndpoints[i].name)) {
+                mBluetoothIdTx = mBTEndpoints[i].tx;
+                mBluetoothIdRx = mBTEndpoints[i].rx;
+                LOGD("Using custom acoustic parameters for %s", value.string());
+                break;
+            }
+        }
+        if (mBluetoothIdTx == 0) {
+            LOGD("Using default acoustic parameters "
+                 "(%s not in acoustic database)", value.string());
+        }
+        doRouting(NULL);
     }
 
     key = String8(DUALMIC_KEY);
