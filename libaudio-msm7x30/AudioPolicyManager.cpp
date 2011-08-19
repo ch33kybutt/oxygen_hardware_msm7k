@@ -617,16 +617,14 @@ status_t AudioPolicyManager::startOutput(audio_io_handle_t output,
     // necassary for a correct control of hardware output routing by startOutput() and stopOutput()
     outputDesc->changeRefCount(stream, 1);
 
-    if (stream == AudioSystem::FM && output == mA2dpOutput) {
-        setOutputDevice(output, AudioPolicyManagerBase::getNewDevice(output), true);
-    }
 #ifdef WITH_QCOM_LPA
-    else if (output != mLPADecodeOutput) {
-        setOutputDevice(output, AudioPolicyManagerBase::getNewDevice(output));
-    }
+    if ((stream == AudioSystem::FM && output == mA2dpOutput) || output == mLPADecodeOutput) {
+#else
+    if (stream == AudioSystem::FM && output == mA2dpOutput) {
 #endif
-    else{
         setOutputDevice(output, AudioPolicyManagerBase::getNewDevice(output), true);
+    } else {
+        setOutputDevice(output, AudioPolicyManagerBase::getNewDevice(output));
     }
 
     // handle special case for sonification while in call
