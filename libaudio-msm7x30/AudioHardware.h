@@ -322,7 +322,7 @@ private:
     status_t    doRouting(AudioStreamInMSM72xx *input);
     uint32_t    getACDB(int mode, uint32_t device);
     status_t    do_aic3254_control(uint32_t device);
-    void        aic3254_config(uint32_t device, const char* active_ap, const char* aic_effect);
+    void        aic3254_config(uint32_t device);
     int         aic3254_ioctl(int cmd, const int argc);
     void        aic3254_powerdown();
     int         aic3254_set_volume(int volume);
@@ -461,9 +461,10 @@ private:
             int         mNoiseSuppressionState;
             bool        mDualMicEnabled;
             bool        mRecordState;
-            char        mCurDspProfile[18];
+            char        mCurDspProfile[22];
             bool        mEffectEnabled;
-            char        mActiveAP[8];
+            char        mActiveAP[10];
+            char        mEffect[10];
 
      friend class AudioStreamInMSM72xx;
             Mutex       mLock;

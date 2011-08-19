@@ -67,7 +67,7 @@ extern "C" {
 
 namespace android {
 
-Mutex   mDeviceSwitchLock;
+Mutex mDeviceSwitchLock;
 static void * acoustic;
 const uint32_t AudioHardware::inputSamplingRates[] = {
     8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000
@@ -121,6 +121,7 @@ static const uint32_t DEVICE_BT_SCO_TX = 18;           /* bt_sco_tx */
 static const uint32_t DEVICE_COUNT = DEVICE_BT_SCO_TX +1;
 
 static bool support_aic3254 = true;
+int (*set_sound_effect)(const char* effect);
 static bool support_tpa2051 = true;
 static bool support_backmic = true;
 static int alt_enable = 0;
@@ -221,7 +222,7 @@ bool isStreamOnAndInactive(int Stream_type) {
     return false;
 }
 
-Routing_table*  getNodeByStreamType(int Stream_type) {
+Routing_table* getNodeByStreamType(int Stream_type) {
     Routing_table* temp_ptr;
     Mutex::Autolock lock(mRoutingTableLock);
     temp_ptr = head->next;
@@ -606,39 +607,48 @@ AudioHardware::AudioHardware() :
 
     set_tpa2051_parameters = (int (*)(void))::dlsym(acoustic, "set_tpa2051_parameters");
     if ((*set_tpa2051_parameters) == 0) {
-        LOGD("set_tpa2051_parameters() not present");
+        LOGI("set_tpa2051_parameters() not present");
         support_tpa2051 = false;
     }
 
     if (support_tpa2051) {
         if (set_tpa2051_parameters() < 0) {
-            LOGD("Speaker amplifies tpa2051 is not supported");
+            LOGI("Speaker amplifies tpa2051 is not supported");
             support_tpa2051 = false;
         }
     }
 
     set_aic3254_parameters = (int (*)(void))::dlsym(acoustic, "set_aic3254_parameters");
     if ((*set_aic3254_parameters) == 0 ) {
-        LOGD("set_aic3254_parameters() not present");
+        LOGI("set_aic3254_parameters() not present");
         support_aic3254 = false;
     }
 
     if (support_aic3254) {
         if (set_aic3254_parameters() < 0) {
-            LOGD("AIC3254 DSP is not supported");
+            LOGI("AIC3254 DSP is not supported");
+            support_aic3254 = false;
+        }
+    }
+
+    if (support_aic3254) {
+        set_sound_effect = (int (*)(const char*))::dlsym(acoustic, "set_sound_effect");
+        if ((*set_sound_effect) == 0 ) {
+            LOGI("set_sound_effect() not present");
+            LOGI("AIC3254 DSP is not supported");
             support_aic3254 = false;
         }
     }
 
     support_back_mic = (int (*)(void))::dlsym(acoustic, "support_back_mic");
     if ((*support_back_mic) == 0 ) {
-        LOGD("support_back_mic() not present");
+        LOGI("support_back_mic() not present");
             support_backmic = false;
     }
 
     if (support_backmic) {
-        if (support_back_mic() <= 0) {
-            LOGD("DualMic is not supported");
+        if (support_back_mic() < 0) {
+            LOGI("DualMic is not supported");
             support_backmic = false;
         }
     }
@@ -888,23 +898,28 @@ status_t AudioHardware::setParameters(const String8& keyValuePairs) {
     key = String8(ACTIVE_AP);
     if (param.get(key, value) == NO_ERROR) {
         const char* active_ap = value.string();
-        strcpy(mActiveAP, active_ap);
         LOGD("Active AP = %s", active_ap);
+        strcpy(mActiveAP, active_ap);
+
+        const char* dsp_effect = "\0";
+        key = String8(DSP_EFFECT_KEY);
+        if (param.get(key, value) == NO_ERROR) {
+            LOGD("DSP Effect = %s", value.string());
+            dsp_effect = value.string();
+            strcpy(mEffect, dsp_effect);
+        }
 
         key = String8(EFFECT_ENABLED);
         if (param.get(key, value) == NO_ERROR) {
             const char* sound_effect_enable = value.string();
             LOGD("Sound Effect Enabled = %s", sound_effect_enable);
-            if (value == "on")
+            if (value == "on") {
                 mEffectEnabled = true;
-            else
+                aic3254_config(get_snd_dev());
+            } else {
+                strcpy(mEffect, "\0");
                 mEffectEnabled = false;
-        }
-
-        key = String8(DSP_EFFECT_KEY);
-        if (param.get(key, value) == NO_ERROR) {
-            LOGI("DSP Effect = %s", value.string());
-            aic3254_config(get_snd_dev(), active_ap, value.string());
+            }
         }
     }
 
@@ -1364,7 +1379,7 @@ status_t AudioHardware::doAudioRouteOrMute(uint32_t device) {
     }
 
     if (support_aic3254) {
-        aic3254_config(device, "", "");
+        aic3254_config(device);
         do_aic3254_control(device);
     }
 
@@ -1610,6 +1625,7 @@ status_t AudioHardware::do_aic3254_control(uint32_t device) {
                 case SND_DEVICE_NO_MIC_HEADSET:
                 case SND_DEVICE_HEADSET_AND_SPEAKER:
                     new_aic_txmode = VOICERECORD_IMIC;
+                    new_aic_rxmode = PLAYBACK_SPEAKER;
                     break;
                 default:
                     break;
@@ -1627,24 +1643,22 @@ status_t AudioHardware::do_aic3254_control(uint32_t device) {
         if (aic3254_ioctl(AIC3254_CONFIG_TX, new_aic_txmode) >= 0)
             cur_aic_tx = new_aic_txmode;
 
-    if (cur_aic_tx == UPLINK_OFF && cur_aic_rx == DOWNLINK_OFF)
+    if (cur_aic_tx == UPLINK_OFF && cur_aic_rx == DOWNLINK_OFF) {
+        strcpy(mCurDspProfile, "\0");
         aic3254_powerdown();
+    }
 
     return NO_ERROR;
 }
 
-void AudioHardware::aic3254_config(uint32_t device, const char* active_ap,
-                                   const char* aic_effect) {
-    int (*set_sound_effect)(const char* effect);
-    char name[18] = "\0";
-    char base[18] = "\0";
-    char desi[6] = "\0";
-    char aap[8] = "\0";
+void AudioHardware::aic3254_config(uint32_t device) {
+    char name[22] = "\0";
+    char aap[9] = "\0";
 
     if (mMode == AudioSystem::MODE_IN_CALL) {
 #ifdef WITH_SPADE_DSP_PROFILE
         if (support_backmic) {
-            strcpy(base, "DualMic_Phone");
+            strcpy(name, "DualMic_Phone");
             switch (device) {
                 case SND_DEVICE_HANDSET:
                 case SND_DEVICE_HANDSET_BACK_MIC:
@@ -1652,92 +1666,86 @@ void AudioHardware::aic3254_config(uint32_t device, const char* active_ap,
                 case SND_DEVICE_HEADSET_AND_SPEAKER:
                 case SND_DEVICE_HEADSET_AND_SPEAKER_BACK_MIC:
                 case SND_DEVICE_NO_MIC_HEADSET:
-                    strcat(base, "_EP");
+                    strcat(name, "_EP");
                     break;
                 case SND_DEVICE_SPEAKER:
-                    strcat(base, "_SPK");
+                    strcat(name, "_SPK");
                     break;
                 default:
                     break;
             }
         } else {
-            strcpy(base, "Original_Phone");
+            strcpy(name, "Original_Phone");
         }
 #else
-        strcpy(base, "Original_Phone");
+        strcpy(name, "Original_Phone");
         switch (device) {
             case SND_DEVICE_HANDSET:
             case SND_DEVICE_HANDSET_BACK_MIC:
-                strcat(base, "_REC");
+                strcat(name, "_REC");
                 break;
             case SND_DEVICE_HEADSET:
             case SND_DEVICE_HEADSET_AND_SPEAKER:
             case SND_DEVICE_HEADSET_AND_SPEAKER_BACK_MIC:
             case SND_DEVICE_NO_MIC_HEADSET:
-                strcat(base, "_HP");
+                strcat(name, "_HP");
                 break;
             case SND_DEVICE_SPEAKER:
-                strcat(base, "_SPK");
+                strcat(name, "_SPK");
                 break;
             default:
                 break;
         }
 #endif
     } else {
-        if (mRecordState)
 #ifdef WITH_SPADE_DSP_PROFILE
-            strcpy(base, "Original");
+        if (mRecordState) {
 #else
-            strcpy(base, "Recording");
+        if ((strcasecmp(mActiveAP, "Camcorder") == 0)) {
+            if (strlen(mEffect) != 0) {
+                strcpy(name, "Recording_");
+                strcat(name, mEffect);
+            } else
+                strcpy(name, "Original");
+        } else if (mRecordState) {
 #endif
-        else if (strlen(aic_effect) == 0 && !mEffectEnabled)
-            strcpy(base, "Original");
+#ifdef WITH_SPADE_DSP_PROFILE
+            strcpy(name, "Original");
+#else
+            strcpy(name, "Original_Recording");
+#endif
+        } else if (strlen(mEffect) == 0 && !mEffectEnabled)
+            strcpy(name, "Original");
         else {
-            if (strlen(aic_effect) == 0 && mEffectEnabled)
-                strcpy(base, mCurDspProfile);
-            else
-                strcpy(base, aic_effect);
+            if (mEffectEnabled)
+                strcpy(name, mEffect);
 
-            if (strlen(active_ap) == 0)
-                strcpy(aap, mActiveAP);
-            else
-                strcpy(aap, active_ap);
-
-            if (strcasecmp(base, "Srs") == 0 ||
-                strcasecmp(base, "Dolby") == 0) {
-                if (strcasecmp(aap, "Music") == 0)
-                    strcat(desi, "_a");
-                else if (strcasecmp(aap, "Video") == 0)
-                    strcat(desi, "_v");
+            if ((strcasecmp(name, "Srs") == 0) ||
+                (strcasecmp(name, "Dolby") == 0)) {
+                strcpy(mEffect, name);
+                if (strcasecmp(mActiveAP, "Music") == 0)
+                    strcat(name, "_a");
+                else if (strcasecmp(mActiveAP, "Video") == 0)
+                    strcat(name, "_v");
                 if (device == SND_DEVICE_SPEAKER)
-                    strcat(desi, "_spk");
+                    strcat(name, "_spk");
                 else
-                    strcat(desi, "_hp");
+                    strcat(name, "_hp");
             }
         }
     }
 
-    strcat(name, base);
-    strcat(name, desi);
-
-    if (strcmp(mCurDspProfile, name))
+    if (strcasecmp(mCurDspProfile, name)) {
         LOGD("aic3254_config: loading effect %s", name);
-    else {
+        strcpy(mCurDspProfile, name);
+    } else {
         LOGD("aic3254_config: effect %s already loaded", name);
-        return;
-    }
-
-    set_sound_effect = (int (*)(const char*))::dlsym(acoustic, "set_sound_effect");
-    if ((*set_sound_effect) == 0 ) {
-        LOGE("Could not open set_sound_effect()");
         return;
     }
 
     int rc = set_sound_effect(name);
     if (rc < 0)
         LOGE("Could not set sound effect %s: %d", name, rc);
-    else
-        strcpy(mCurDspProfile, base);
 }
 
 int AudioHardware::aic3254_ioctl(int cmd, const int argc) {
@@ -2922,7 +2930,7 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes) 
         mHardware->doRouting(this);
         if (support_aic3254) {
             int snd_dev = mHardware->get_snd_dev();
-            mHardware->aic3254_config(snd_dev, "", "");
+            mHardware->aic3254_config(snd_dev);
             mHardware->do_aic3254_control(snd_dev);
         }
         if (ioctl(mFd, AUDIO_START, 0)) {
@@ -3068,7 +3076,7 @@ status_t AudioHardware::AudioStreamInMSM72xx::standby() {
         mHardware->set_mRecordState(false);
         if (support_aic3254) {
             int snd_dev = mHardware->get_snd_dev();
-            mHardware->aic3254_config(snd_dev, "", "");
+            mHardware->aic3254_config(snd_dev);
             mHardware->do_aic3254_control(snd_dev);
         }
     }
