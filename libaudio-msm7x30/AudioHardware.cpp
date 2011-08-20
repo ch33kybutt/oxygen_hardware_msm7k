@@ -121,13 +121,14 @@ static const uint32_t DEVICE_BT_SCO_TX = 18;           /* bt_sco_tx */
 static const uint32_t DEVICE_COUNT = DEVICE_BT_SCO_TX +1;
 
 static bool support_aic3254 = true;
+static bool aic3254_enabled = false;
 int (*set_sound_effect)(const char* effect);
 static bool support_tpa2051 = true;
 static bool support_backmic = true;
 static int alt_enable = 0;
 static int hac_enable = 0;
-static uint32_t cur_aic_tx = 0;
-static uint32_t cur_aic_rx = 0;
+static uint32_t cur_aic_tx = UPLINK_OFF;
+static uint32_t cur_aic_rx = DOWNLINK_OFF;
 
 int dev_cnt = 0;
 const char ** name = NULL;
@@ -384,7 +385,7 @@ static status_t updateDeviceInfo(uint32_t rx_device, uint32_t tx_device,
                 if (isTxDeviceEnabled == false) {
                     enableDevice(temp_ptr->dev_id, 0);
                     enableDevice(tx_device, 1);
-                   isTxDeviceEnabled = true;
+                    isTxDeviceEnabled = true;
                 }
                 if (msm_route_stream(PCM_REC, temp_ptr->dec_id, DEV_ID(temp_ptr->dev_id), 0)) {
                     LOGE("msm_route_stream(PCM_PLAY, %d, %d, 0) failed", temp_ptr->dec_id, DEV_ID(temp_ptr->dev_id));
@@ -1657,17 +1658,44 @@ status_t AudioHardware::do_aic3254_control(uint32_t device) {
         if (aic3254_ioctl(AIC3254_CONFIG_TX, new_aic_txmode) >= 0)
             cur_aic_tx = new_aic_txmode;
 
-    if (cur_aic_tx == UPLINK_OFF && cur_aic_rx == DOWNLINK_OFF) {
+    if (cur_aic_tx == UPLINK_OFF && cur_aic_rx == DOWNLINK_OFF && aic3254_enabled) {
         strcpy(mCurDspProfile, "\0");
+        aic3254_enabled = false;
         aic3254_powerdown();
-    }
+    } else if (cur_aic_tx != UPLINK_OFF || cur_aic_rx != DOWNLINK_OFF)
+        aic3254_enabled = true;
 
     return NO_ERROR;
 }
 
-void AudioHardware::aic3254_config(uint32_t device) {
+bool AudioHardware::isAic3254Device(uint32_t device) {
+    switch(device) {
+        case SND_DEVICE_HANDSET:
+        case SND_DEVICE_SPEAKER:
+        case SND_DEVICE_HEADSET:
+        case SND_DEVICE_NO_MIC_HEADSET:
+        case SND_DEVICE_FM_HEADSET:
+        case SND_DEVICE_HEADSET_AND_SPEAKER:
+        case SND_DEVICE_FM_SPEAKER:
+        case SND_DEVICE_HEADPHONE_AND_SPEAKER:
+        case SND_DEVICE_HANDSET_BACK_MIC:
+        case SND_DEVICE_SPEAKER_BACK_MIC:
+        case SND_DEVICE_NO_MIC_HEADSET_BACK_MIC:
+        case SND_DEVICE_HEADSET_AND_SPEAKER_BACK_MIC:
+            return true;
+            break;
+        default:
+            return false;
+            break;
+    }
+}
+
+status_t AudioHardware::aic3254_config(uint32_t device) {
     char name[22] = "\0";
     char aap[9] = "\0";
+
+    if (!isAic3254Device(device))
+        return NO_ERROR;
 
     if (mMode == AudioSystem::MODE_IN_CALL) {
 #ifdef WITH_SPADE_DSP_PROFILE
@@ -1754,12 +1782,16 @@ void AudioHardware::aic3254_config(uint32_t device) {
         strcpy(mCurDspProfile, name);
     } else {
         LOGD("aic3254_config: effect %s already loaded", name);
-        return;
+        return NO_ERROR;
     }
 
     int rc = set_sound_effect(name);
-    if (rc < 0)
+    if (rc < 0) {
         LOGE("Could not set sound effect %s: %d", name, rc);
+        return rc;
+    }
+
+    return NO_ERROR;
 }
 
 int AudioHardware::aic3254_ioctl(int cmd, const int argc) {
@@ -2906,8 +2938,8 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes) 
                 addToTable(dec_id,cur_tx,INVALID_DEVICE,FM_REC,true);
                 mFmRec = FM_FILE_REC;
             }
-            hw->mLock.unlock();
 */
+            hw->mLock.unlock();
         } else {
             hw->mLock.unlock();
             if (ioctl(mFd, AUDIO_GET_SESSION_ID, &dec_id)) {

@@ -322,7 +322,8 @@ private:
     status_t    doRouting(AudioStreamInMSM72xx *input);
     uint32_t    getACDB(int mode, uint32_t device);
     status_t    do_aic3254_control(uint32_t device);
-    void        aic3254_config(uint32_t device);
+    bool        isAic3254Device(uint32_t device);
+    status_t    aic3254_config(uint32_t device);
     int         aic3254_ioctl(int cmd, const int argc);
     void        aic3254_powerdown();
     int         aic3254_set_volume(int volume);
