@@ -111,20 +111,24 @@ static const uint32_t DEVICE_FMRADIO_HEADSET_RX = 8;   /* fmradio_headset_rx */
 static const uint32_t DEVICE_TTY_HEADSET_MONO_TX = 9;  /* tty_headset_mono_tx */
 static const uint32_t DEVICE_TTY_HEADSET_MONO_RX = 10; /* tty_headset_mono_rx */
 static const uint32_t DEVICE_SPEAKER_TX = 11;          /* speaker_mono_tx */
-static const uint32_t DEVICE_SPEAKER_HEADSET_RX = 12;  /* headset_speaker_stereo_rx */
+static const uint32_t DEVICE_SPEAKER_HEADSET_RX = 12;  /* htc: headset_speaker_stereo_rx
+                                                          caf: headset_stereo_speaker_stereo_rx */
 static const uint32_t DEVICE_USB_HEADSET_RX = 13;      /* usb_headset_stereo_rx */
 static const uint32_t DEVICE_HAC_RX = 14;              /* hac_mono_rx */
 static const uint32_t DEVICE_ALT_RX = 15;              /* alt_mono_rx */
 static const uint32_t DEVICE_VR_HANDSET = 16;          /* handset_vr_tx */
 static const uint32_t DEVICE_BT_SCO_RX = 17;           /* bt_sco_rx */
 static const uint32_t DEVICE_BT_SCO_TX = 18;           /* bt_sco_tx */
-static const uint32_t DEVICE_COUNT = DEVICE_BT_SCO_TX +1;
+static const uint32_t DEVICE_DUALMIC_HANDSET_TX = 19;  /* handset_dual_mic_endfire_tx */
+static const uint32_t DEVICE_DUALMIC_SPEAKER_TX = 20;  /* speaker_dual_mic_endfire_tx */
+static const uint32_t DEVICE_COUNT = DEVICE_DUALMIC_SPEAKER_TX +1;
 
 static bool support_aic3254 = true;
 static bool aic3254_enabled = false;
 int (*set_sound_effect)(const char* effect);
 static bool support_tpa2051 = true;
-static bool support_backmic = true;
+static bool support_htc_backmic = true;
+static bool isHTCPhone = true;
 static int alt_enable = 0;
 static int hac_enable = 0;
 static uint32_t cur_aic_tx = UPLINK_OFF;
@@ -305,7 +309,12 @@ int enableDevice(int device, short enable) {
 
 void updateACDB(uint32_t new_rx_device, uint32_t new_tx_device,
                 uint32_t new_rx_acdb, uint32_t new_tx_acdb) {
-    LOGD("updateACDB: (%d, %d, %d, %d) ", new_tx_device, new_rx_device, new_tx_acdb, new_rx_acdb);
+
+    if (!isHTCPhone) {
+        LOGD("This is not an HTC Phone, skip updateACDB()");
+        return;
+    } else
+        LOGD("updateACDB: (%d, %d, %d, %d) ", new_tx_device, new_rx_device, new_tx_acdb, new_rx_acdb);
 
     int rc = -1;
     int (*update_acdb_id)(uint32_t, uint32_t, uint32_t, uint32_t);
@@ -470,17 +479,19 @@ AudioHardware::AudioHardware() :
     int control;
     int i = 0, index = 0;
 
+    head = (Routing_table* ) malloc(sizeof(Routing_table));
+    head->next = NULL;
+
     acoustic =:: dlopen("/system/lib/libhtc_acoustic.so", RTLD_NOW);
     if (acoustic == NULL ) {
         LOGD("Could not open libhtc_acoustic.so");
         /* this is not really an error on non-htc devices... */
         mNumBTEndpoints = 0;
-        mInit = true;
-        return;
+        isHTCPhone = false;
+        support_aic3254 = false;
+        support_tpa2051 = false;
+        support_htc_backmic = false;
     }
-
-    head = (Routing_table* ) malloc(sizeof(Routing_table));
-    head->next = NULL;
 
     LOGD("msm_mixer_open: Opening the device");
     control = msm_mixer_open("/dev/snd/controlC0", 0);
@@ -505,6 +516,12 @@ AudioHardware::AudioHardware() :
     }
     for (i = 0; i < dev_cnt; i++)
         device_list[i].dev_id = INVALID_DEVICE;
+
+    char speaker_headset_rx[40];
+    if (isHTCPhone)
+        strcpy(speaker_headset_rx, "headset_speaker_stereo_rx");
+    else
+        strcpy(speaker_headset_rx, "headset_stereo_speaker_stereo_rx");
 
     for (i = 0; i < dev_cnt; i++) {
         LOGV("******* name[%d] = [%s] *********", i, (char* )name[i]);
@@ -532,7 +549,7 @@ AudioHardware::AudioHardware() :
             index = DEVICE_TTY_HEADSET_MONO_RX;
         else if (strcmp((char*)name[i], "speaker_mono_tx") == 0)
             index = DEVICE_SPEAKER_TX;
-        else if (strcmp((char*)name[i], "headset_speaker_stereo_rx") == 0)
+        else if (strcmp((char*)name[i], speaker_headset_rx) == 0)
             index = DEVICE_SPEAKER_HEADSET_RX;
         else if (strcmp((char*)name[i], "usb_headset_stereo_rx") == 0)
             index = DEVICE_USB_HEADSET_RX;
@@ -546,6 +563,10 @@ AudioHardware::AudioHardware() :
             index = DEVICE_BT_SCO_RX;
         else if (strcmp((char*)name[i], "bt_sco_tx") == 0)
             index = DEVICE_BT_SCO_TX;
+        else if(strcmp((char* )name[i], "handset_dual_mic_endfire_tx") == 0)
+            index = DEVICE_DUALMIC_HANDSET_TX;
+        else if(strcmp((char* )name[i], "speaker_dual_mic_endfire_tx") == 0)
+            index = DEVICE_DUALMIC_SPEAKER_TX;
         else 
             continue;
         LOGV("index = %d", index);
@@ -562,6 +583,13 @@ AudioHardware::AudioHardware() :
                                                            device_list[index].dev_id);
     }
 
+    if (!isHTCPhone) {
+        // skip HTC specific function
+        mInit = true;
+        return;
+    }
+
+    // HTC specific functions
     set_acoustic_parameters = (int (*)(void))::dlsym(acoustic, "set_acoustic_parameters");
     if ((*set_acoustic_parameters) == 0 ) {
         LOGE("Could not open set_acoustic_parameters()");
@@ -571,28 +599,6 @@ AudioHardware::AudioHardware() :
     int rc = set_acoustic_parameters();
     if (rc < 0) {
         LOGD("Could not set acoustic parameters to share memory: %d", rc);
-    }
-
-    snd_get_num = (int (*)(void))::dlsym(acoustic, "snd_get_num");
-    if ((*snd_get_num) == 0 ) {
-        LOGD("Could not open snd_get_num()");
-    }
-
-    mNumBTEndpoints = snd_get_num();
-    LOGV("mNumBTEndpoints = %d", mNumBTEndpoints);
-    mBTEndpoints = new msm_bt_endpoint[mNumBTEndpoints];
-    mInit = true;
-    LOGV("constructed %d SND endpoints)", mNumBTEndpoints);
-    ept = mBTEndpoints;
-    snd_get_bt_endpoint = (int (*)(msm_bt_endpoint *))::dlsym(acoustic, "snd_get_bt_endpoint");
-    if ((*snd_get_bt_endpoint) == 0 ) {
-        LOGE("Could not open snd_get_bt_endpoint()");
-        return;
-    }
-    snd_get_bt_endpoint(mBTEndpoints);
-
-    for (int i = 0; i < mNumBTEndpoints; i++) {
-        LOGV("BT name %s (tx,rx)=(%d,%d)", mBTEndpoints[i].name, mBTEndpoints[i].tx, mBTEndpoints[i].rx);
     }
 
     char value[PROPERTY_VALUE_MAX];
@@ -644,14 +650,36 @@ AudioHardware::AudioHardware() :
     support_back_mic = (int (*)(void))::dlsym(acoustic, "support_back_mic");
     if ((*support_back_mic) == 0 ) {
         LOGI("support_back_mic() not present");
-            support_backmic = false;
+            support_htc_backmic = false;
     }
 
-    if (support_backmic) {
+    if (support_htc_backmic) {
         if (support_back_mic() < 0) {
-            LOGI("DualMic is not supported");
-            support_backmic = false;
+            LOGI("HTC DualMic is not supported");
+            support_htc_backmic = false;
         }
+    }
+
+    snd_get_num = (int (*)(void))::dlsym(acoustic, "snd_get_num");
+    if ((*snd_get_num) == 0 ) {
+        LOGD("Could not open snd_get_num()");
+    }
+
+    mNumBTEndpoints = snd_get_num();
+    LOGV("mNumBTEndpoints = %d", mNumBTEndpoints);
+    mBTEndpoints = new msm_bt_endpoint[mNumBTEndpoints];
+    LOGV("constructed %d SND endpoints)", mNumBTEndpoints);
+    ept = mBTEndpoints;
+    snd_get_bt_endpoint = (int (*)(msm_bt_endpoint *))::dlsym(acoustic, "snd_get_bt_endpoint");
+    if ((*snd_get_bt_endpoint) == 0 ) {
+        mInit = true;
+        LOGE("Could not open snd_get_bt_endpoint()");
+        return;
+    }
+    snd_get_bt_endpoint(mBTEndpoints);
+
+    for (int i = 0; i < mNumBTEndpoints; i++) {
+        LOGV("BT name %s (tx,rx)=(%d,%d)", mBTEndpoints[i].name, mBTEndpoints[i].tx, mBTEndpoints[i].rx);
     }
 
     mInit = true;
@@ -1042,7 +1070,8 @@ status_t AudioHardware::setVoiceVolume(float v) {
     if (mMode == AudioSystem::MODE_IN_CALL &&
         mCurSndDevice != SND_DEVICE_BT &&
         mCurSndDevice != SND_DEVICE_CARKIT &&
-        mCurSndDevice != SND_DEVICE_BT_EC_OFF)
+        mCurSndDevice != SND_DEVICE_BT_EC_OFF &&
+        isHTCPhone)
     {
         uint32_t new_tx_acdb = getACDB(MOD_TX, mCurSndDevice);
         uint32_t new_rx_acdb = getACDB(MOD_RX, mCurSndDevice);
@@ -1258,7 +1287,6 @@ static status_t do_route_audio_rpc(uint32_t device,
             new_tx_device = DEVICE_HANDSET_TX;
             LOGV("In FM HEADSET");
             break;
-/*
         case SND_DEVICE_IN_S_SADC_OUT_HANDSET:
             new_rx_device = DEVICE_HANDSET_RX;
             new_tx_device = DEVICE_DUALMIC_HANDSET_TX;
@@ -1269,7 +1297,6 @@ static status_t do_route_audio_rpc(uint32_t device,
             new_tx_device = DEVICE_DUALMIC_SPEAKER_TX;
             LOGV("In DUALMIC_SPEAKER");
             break;
-*/
         case SND_DEVICE_TTY_FULL:
             new_rx_device = DEVICE_TTY_HEADSET_MONO_RX;
             new_tx_device = DEVICE_TTY_HEADSET_MONO_TX;
@@ -1464,6 +1491,12 @@ status_t AudioHardware::get_snd_dev(void) {
 }
 
 uint32_t AudioHardware::getACDB(int mode, uint32_t device) {
+
+    if (!isHTCPhone) {
+        LOGD("This is not an HTC Phone, skip getACDB()");
+        return 0;
+    }
+
     uint32_t acdb_id = 0;
     int batt_temp = 0;
 
@@ -1699,7 +1732,7 @@ status_t AudioHardware::aic3254_config(uint32_t device) {
 
     if (mMode == AudioSystem::MODE_IN_CALL) {
 #ifdef WITH_SPADE_DSP_PROFILE
-        if (support_backmic) {
+        if (support_htc_backmic) {
             strcpy(name, "DualMic_Phone");
             switch (device) {
                 case SND_DEVICE_HANDSET:
@@ -2327,6 +2360,7 @@ ssize_t AudioHardware::AudioStreamOutMSM72xx::write(const void* buffer, size_t b
             uint32_t rx_acdb_id = mHardware->getACDB(MOD_PLAY, mHardware->get_snd_dev());
             updateACDB(cur_rx, cur_tx, rx_acdb_id, 0);
 
+            LOGD("msm_route_stream(PCM_PLAY, %d, %d, 1)", dec_id, DEV_ID(cur_rx));
             if (msm_route_stream(PCM_PLAY, dec_id, DEV_ID(cur_rx), 1)) {
                 LOGE("msm_route_stream failed");
                 return 0;
@@ -2960,6 +2994,7 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes) 
             uint32_t tx_acdb_id = mHardware->getACDB(MOD_REC, mHardware->get_snd_dev());
             updateACDB(cur_rx, cur_tx, 0, tx_acdb_id);
 
+            LOGD("msm_route_stream(PCM_PLAY, %d, %d, 1)", dec_id, DEV_ID(cur_rx));
             if (msm_route_stream(PCM_REC, dec_id, DEV_ID(cur_tx), 1)) {
                 LOGE("msm_route_stream failed");
                 return -1;
