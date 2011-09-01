@@ -327,8 +327,10 @@ private:
     int         aic3254_ioctl(int cmd, const int argc);
     void        aic3254_powerdown();
     int         aic3254_set_volume(int volume);
+#ifdef HAVE_FM_RADIO
     status_t    enableFM(uint32_t sndDevice);
     status_t    disableFM();
+#endif
     AudioStreamInMSM72xx*   getActiveInput_l();
 
     class AudioStreamOutMSM72xx : public AudioStreamOut {

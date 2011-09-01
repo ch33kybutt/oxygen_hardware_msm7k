@@ -105,7 +105,8 @@ static const uint32_t DEVICE_HEADSET_RX = 2;           /* headset_stereo_rx */
 static const uint32_t DEVICE_HEADSET_MONO_RX = 3;      /* headset_mono_rx */
 static const uint32_t DEVICE_HEADSET_TX = 4;           /* headset_mono_tx */
 static const uint32_t DEVICE_FMRADIO_HANDSET_RX = 5;   /* fmradio_handset_rx */
-static const uint32_t DEVICE_SPEAKER_RX = 6;           /* speaker_mono_rx */
+static const uint32_t DEVICE_SPEAKER_RX = 6;           /* htc: speaker_mono_rx
+                                                          caf: speaker_sterteo_rx */
 static const uint32_t DEVICE_FMRADIO_SPEAKER_RX = 7;   /* fmradio_speaker_rx */
 static const uint32_t DEVICE_FMRADIO_HEADSET_RX = 8;   /* fmradio_headset_rx */
 static const uint32_t DEVICE_TTY_HEADSET_MONO_TX = 9;  /* tty_headset_mono_tx */
@@ -538,6 +539,8 @@ AudioHardware::AudioHardware() :
         else if (strcmp((char*)name[i], "fmradio_handset_rx") == 0)
             index = DEVICE_FMRADIO_HANDSET_RX;
         else if (strcmp((char*)name[i], "speaker_mono_rx") == 0)
+            index = DEVICE_SPEAKER_RX;
+        else if (strcmp((char*)name[i], "speaker_stereo_rx") == 0)
             index = DEVICE_SPEAKER_RX;
         else if (strcmp((char*)name[i], "fmradio_speaker_rx") == 0)
             index = DEVICE_FMRADIO_SPEAKER_RX;
@@ -1877,9 +1880,13 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input) {
         LOGI("do input routing device %x", inputDevice);
         /* ignore routing device information when we start a recording in voice call
            Recording will happen through currently active tx device */
+#ifdef HAVE_FM_RADIO
         if ((inputDevice == AudioSystem::DEVICE_IN_VOICE_CALL) ||
            (inputDevice == AudioSystem::DEVICE_IN_FM_RX) ||
            (inputDevice == AudioSystem::DEVICE_IN_FM_RX_A2DP))
+#else
+        if (inputDevice == AudioSystem::DEVICE_IN_VOICE_CALL)
+#endif
             return NO_ERROR;
         if (inputDevice != 0) {
             if (inputDevice & AudioSystem::DEVICE_IN_BLUETOOTH_SCO_HEADSET) {
@@ -1951,30 +1958,45 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input) {
                 LOGI("Routing audio to No microphone Wired Headset and Speaker (%d,%d)", mMode, outputDevices);
                 sndDevice = SND_DEVICE_HEADPHONE_AND_SPEAKER;
             } else {
+#ifdef HAVE_FM_RADIO
                 if (outputDevices & AudioSystem::DEVICE_OUT_FM) {
                     LOGI("Routing FM audio to No microphone Wired Headset (%d,%d)", mMode, outputDevices);
                     sndDevice = SND_DEVICE_FM_HEADSET;
                 } else {
+#else
                     LOGI("Routing audio to No microphone Wired Headset (%d,%d)", mMode, outputDevices);
                     sndDevice = SND_DEVICE_NO_MIC_HEADSET;
+#endif
+#ifdef HAVE_FM_RADIO
                 }
+#endif
             }
         } else if (outputDevices & AudioSystem::DEVICE_OUT_WIRED_HEADSET) {
+#ifdef HAVE_FM_RADIO
             if (outputDevices & AudioSystem::DEVICE_OUT_FM) {
                 LOGI("Routing FM audio to Wired Headset");
                 sndDevice = SND_DEVICE_FM_HEADSET;
             } else {
+#else
                 LOGI("Routing audio to Wired Headset");
                 sndDevice = SND_DEVICE_HEADSET;
+#endif
+#ifdef HAVE_FM_RADIO
             }
+#endif
         } else if (outputDevices & AudioSystem::DEVICE_OUT_SPEAKER) {
+#ifdef HAVE_FM_RADIO
             if (outputDevices & AudioSystem::DEVICE_OUT_FM) {
                 LOGI("Routing FM audio to Speakerphone");
                 sndDevice = SND_DEVICE_FM_SPEAKER;
             } else {
+#else
                 LOGI("Routing audio to Speakerphone");
                 sndDevice = SND_DEVICE_SPEAKER;
+#endif
+#ifdef HAVE_FM_RADIO
             }
+#endif
         } else if (outputDevices & AudioSystem::DEVICE_OUT_EARPIECE) {
             LOGI("Routing audio to Handset");
             sndDevice = SND_DEVICE_HANDSET;
@@ -1991,10 +2013,12 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input) {
         }
     }
 
+#ifdef HAVE_FM_RADIO
     if (outputDevices & AudioSystem::DEVICE_OUT_FM)
         enableFM(sndDevice);
     else
         disableFM();
+#endif
 
     if ((sndDevice != INVALID_DEVICE && sndDevice != mCurSndDevice)) {
         ret = doAudioRouteOrMute(sndDevice);
@@ -2014,6 +2038,7 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input) {
     return ret;
 }
 
+#ifdef HAVE_FM_RADIO
 status_t AudioHardware::enableFM(uint32_t sndDevice) {
     LOGD("enableFM");
 
@@ -2047,6 +2072,7 @@ status_t AudioHardware::disableFM() {
 
     return NO_ERROR;
 }
+#endif
 
 status_t AudioHardware::checkMicMute() {
     Mutex::Autolock lock(mLock);
@@ -2537,6 +2563,7 @@ status_t AudioHardware::AudioStreamInMSM72xx::set(
     }
     status_t status =0;
     struct msm_voicerec_mode voc_rec_cfg;
+#ifdef HAVE_FM_RADIO
     if (devices == AudioSystem::DEVICE_IN_FM_RX_A2DP) {
         status = ::open("/dev/msm_a2dp_in", O_RDONLY);
         if (status < 0) {
@@ -2590,6 +2617,9 @@ status_t AudioHardware::AudioStreamInMSM72xx::set(
         mSampleRate = config.sample_rate;
         mBufferSize = config.buffer_size;
     } else if (*pFormat == AUDIO_HW_IN_FORMAT) {
+#else
+    if (*pFormat == AUDIO_HW_IN_FORMAT) {
+#endif
         /* open audio input device */
         status = ::open("/dev/msm_pcm_in", O_RDONLY);
         if (status < 0) {
@@ -2943,6 +2973,7 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes) 
             hw->mLock.unlock();
             return -1;
         }
+#ifdef HAVE_FM_RADIO
         if ((mDevices == AudioSystem::DEVICE_IN_FM_RX) ||
             (mDevices == AudioSystem::DEVICE_IN_FM_RX_A2DP)) {
 /*
@@ -2975,6 +3006,7 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes) 
 */
             hw->mLock.unlock();
         } else {
+#else
             hw->mLock.unlock();
             if (ioctl(mFd, AUDIO_GET_SESSION_ID, &dec_id)) {
                 LOGE("AUDIO_GET_SESSION_ID failed*********");
@@ -3001,7 +3033,10 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes) 
             }
             addToTable(dec_id,cur_tx, INVALID_DEVICE, PCM_REC, true);
             mFirstread = false;
+#endif
+#ifdef HAVE_FM_RADIO
         }
+#endif
     }
 
     if (mState < AUDIO_INPUT_STARTED) {
