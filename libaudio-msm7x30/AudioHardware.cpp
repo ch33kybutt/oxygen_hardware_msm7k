@@ -16,12 +16,11 @@
 ** limitations under the License.
 */
 
-#include <math.h>
-
 //#define LOG_NDEBUG 0
-#define LOG_NDDEBUG 0
-
+//#define LOG_NDDEBUG 0
 #define LOG_TAG "AudioHardwareMSM7X30"
+
+#include <math.h>
 #include <utils/Log.h>
 #include <utils/String8.h>
 
@@ -525,7 +524,7 @@ AudioHardware::AudioHardware() :
         strcpy(speaker_headset_rx, "headset_stereo_speaker_stereo_rx");
 
     for (i = 0; i < dev_cnt; i++) {
-        LOGV("******* name[%d] = [%s] *********", i, (char* )name[i]);
+        LOGI("******* name[%d] = [%s] *********", i, (char* )name[i]);
         if (strcmp((char*)name[i], "handset_rx") == 0)
             index = DEVICE_HANDSET_RX;
         else if (strcmp((char*)name[i], "handset_tx") == 0)
@@ -572,16 +571,16 @@ AudioHardware::AudioHardware() :
             index = DEVICE_DUALMIC_SPEAKER_TX;
         else 
             continue;
-        LOGV("index = %d", index);
+        LOGI("index = %d", index);
 
         device_list[index].dev_id = msm_get_device((char* )name[i]);
         if (device_list[index].dev_id >= 0) {
-            LOGV("Found device: %s:index = %d, dev_id: %d", ( char* )name[i],
+            LOGI("Found device: %s:index = %d, dev_id: %d", ( char* )name[i],
                                                               index,device_list[index].dev_id);
         }
         device_list[index].class_id = msm_get_device_class(device_list[index].dev_id);
         device_list[index].capability = msm_get_device_capability(device_list[index].dev_id);
-        LOGV("class ID = %d,capablity = %d for device %d", device_list[index].class_id,
+        LOGI("class ID = %d,capablity = %d for device %d", device_list[index].class_id,
                                                            device_list[index].capability,
                                                            device_list[index].dev_id);
     }
@@ -1963,12 +1962,12 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input) {
                     LOGI("Routing FM audio to No microphone Wired Headset (%d,%d)", mMode, outputDevices);
                     sndDevice = SND_DEVICE_FM_HEADSET;
                 } else {
-#else
                     LOGI("Routing audio to No microphone Wired Headset (%d,%d)", mMode, outputDevices);
                     sndDevice = SND_DEVICE_NO_MIC_HEADSET;
-#endif
-#ifdef HAVE_FM_RADIO
                 }
+#else
+                LOGI("Routing audio to No microphone Wired Headset (%d,%d)", mMode, outputDevices);
+                sndDevice = SND_DEVICE_NO_MIC_HEADSET;
 #endif
             }
         } else if (outputDevices & AudioSystem::DEVICE_OUT_WIRED_HEADSET) {
@@ -1977,12 +1976,12 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input) {
                 LOGI("Routing FM audio to Wired Headset");
                 sndDevice = SND_DEVICE_FM_HEADSET;
             } else {
-#else
                 LOGI("Routing audio to Wired Headset");
                 sndDevice = SND_DEVICE_HEADSET;
-#endif
-#ifdef HAVE_FM_RADIO
             }
+#else
+            LOGI("Routing audio to Wired Headset");
+            sndDevice = SND_DEVICE_HEADSET;
 #endif
         } else if (outputDevices & AudioSystem::DEVICE_OUT_SPEAKER) {
 #ifdef HAVE_FM_RADIO
@@ -1990,12 +1989,12 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input) {
                 LOGI("Routing FM audio to Speakerphone");
                 sndDevice = SND_DEVICE_FM_SPEAKER;
             } else {
-#else
                 LOGI("Routing audio to Speakerphone");
                 sndDevice = SND_DEVICE_SPEAKER;
-#endif
-#ifdef HAVE_FM_RADIO
             }
+#else
+            LOGI("Routing audio to Speakerphone");
+            sndDevice = SND_DEVICE_SPEAKER;
 #endif
         } else if (outputDevices & AudioSystem::DEVICE_OUT_EARPIECE) {
             LOGI("Routing audio to Handset");
@@ -2124,7 +2123,6 @@ uint32_t AudioHardware::getInputSampleRate(uint32_t sampleRate) {
     /* i is always > 0 here */
     return inputSamplingRates[i-1];
 }
-
 
 /* ---------------------------------------------------------------------------- */
 

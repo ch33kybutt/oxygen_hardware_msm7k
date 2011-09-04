@@ -304,12 +304,11 @@ status_t AudioPolicyManager::setDeviceConnectionState(AudioSystem::audio_devices
 #endif
 #ifdef HAVE_FM_RADIO
         if (device == AudioSystem::DEVICE_OUT_FM) {
-            if (state == AudioSystem::DEVICE_STATE_AVAILABLE) {
+            if (state == AudioSystem::DEVICE_STATE_AVAILABLE)
                 mOutputs.valueFor(mHardwareOutput)->changeRefCount(AudioSystem::FM, 1);
-            }
-            else {
+            else
                 mOutputs.valueFor(mHardwareOutput)->changeRefCount(AudioSystem::FM, -1);
-            }
+
             if (newDevice == 0) {
                 newDevice = getDeviceForStrategy(STRATEGY_MEDIA, false);
             }
@@ -623,23 +622,28 @@ status_t AudioPolicyManager::startOutput(audio_io_handle_t output,
     // necassary for a correct control of hardware output routing by startOutput() and stopOutput()
     outputDesc->changeRefCount(stream, 1);
 
+#ifdef HAVE_FM_RADIO
 #ifdef WITH_QCOM_LPA
-#ifdef HAVE_FM_RADIO
-    if ((stream == AudioSystem::FM && output == mA2dpOutput) || output == mLPADecodeOutput) {
-#else
-    if (output == mA2dpOutput || output == mLPADecodeOutput) {
-#endif
-#else
-#ifdef HAVE_FM_RADIO
-    if (stream == AudioSystem::FM && output == mA2dpOutput) {
-#else
-    if (output == mA2dpOutput) {
-#endif
-#endif
+    if ((stream == AudioSystem::FM && output == mA2dpOutput) || output == mLPADecodeOutput)
         setOutputDevice(output, AudioPolicyManagerBase::getNewDevice(output), true);
-    } else {
+    else
         setOutputDevice(output, AudioPolicyManagerBase::getNewDevice(output));
-    }
+#else
+    if (stream == AudioSystem::FM && output == mA2dpOutput)
+        setOutputDevice(output, AudioPolicyManagerBase::getNewDevice(output), true);
+    else
+        setOutputDevice(output, AudioPolicyManagerBase::getNewDevice(output));
+#endif
+#else
+#ifdef WITH_QCOM_LPA
+    if (output == mLPADecodeOutput)
+        setOutputDevice(output, AudioPolicyManagerBase::getNewDevice(output), true);
+    else
+        setOutputDevice(output, AudioPolicyManagerBase::getNewDevice(output));
+#else
+    setOutputDevice(output, AudioPolicyManagerBase::getNewDevice(output));
+#endif
+#endif
 
     // handle special case for sonification while in call
     if (isInCall()) {
