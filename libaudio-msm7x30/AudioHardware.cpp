@@ -960,7 +960,8 @@ status_t AudioHardware::setParameters(const String8& keyValuePairs) {
             LOGD("Sound Effect Enabled = %s", sound_effect_enable);
             if (value == "on") {
                 mEffectEnabled = true;
-                aic3254_config(get_snd_dev());
+                if (support_aic3254)
+                    aic3254_config(get_snd_dev());
             } else {
                 strcpy(mEffect, "\0");
                 mEffectEnabled = false;
