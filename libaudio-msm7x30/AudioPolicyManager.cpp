@@ -400,7 +400,7 @@ void AudioPolicyManager::setPhoneState(int state)
         return;
     }
 
-    if (state == mPhoneState ) {
+    if (state == mPhoneState) {
         LOGW("setPhoneState() setting same state %d", state);
         return;
     }
@@ -417,7 +417,9 @@ void AudioPolicyManager::setPhoneState(int state)
     // store previous phone state for management of sonification strategy below
     int oldState = mPhoneState;
     mPhoneState = state;
-    bool force = false;
+    // force routing command to audio hardware when starting call
+    // even if no device change is needed
+    bool force = (mPhoneState == AudioSystem::MODE_IN_CALL);
 
     // are we entering or starting a call
     if (!isStateInCall(oldState) && isStateInCall(state)) {
@@ -457,6 +459,7 @@ void AudioPolicyManager::setPhoneState(int state)
     // even if no device change is needed
     if (isStateInCall(oldState) && newDevice == 0) {
         newDevice = hwOutputDesc->device();
+        force = true;
     }
 
     // when changing from ring tone to in call mode, mute the ringing tone
@@ -535,7 +538,7 @@ audio_io_handle_t AudioPolicyManager::getSession(AudioSystem::stream_type stream
     }
     mOutputs.add(output, outputDesc);
     mLPADecodeOutput = output;
-    mLPAStreamType   = stream;
+    mLPAStreamType = stream;
     return output;
 }
 
@@ -558,8 +561,7 @@ void AudioPolicyManager::resumeSession(audio_io_handle_t output, AudioSystem::st
 {
     LOGV("resumeSession() Output [%d] and stream is [%d]", output, stream);
 
-    if (output == mLPAActiveOuput)
-    {
+    if (output == mLPAActiveOuput) {
         mLPADecodeOutput = mLPAActiveOuput;
         mLPAStreamType = stream;
 
@@ -695,7 +697,7 @@ status_t AudioPolicyManager::stopOutput(audio_io_handle_t output,
 
 #ifdef WITH_A2DP
         if (mA2dpOutput != 0 && !a2dpUsedForSonification() &&
-                strategy == STRATEGY_SONIFICATION) {
+            strategy == STRATEGY_SONIFICATION) {
             setStrategyMute(STRATEGY_MEDIA,
                             false,
                             mA2dpOutput,
@@ -772,8 +774,8 @@ void AudioPolicyManager::setOutputDevice(audio_io_handle_t output, uint32_t devi
         setStrategyMute(STRATEGY_MEDIA, true, output);
 #ifdef WITH_QCOM_LPA
         // Mute LPA output also if it belongs to STRATEGY_MEDIA
-        if ((mLPADecodeOutput != -1 &&
-            mOutputs.valueFor(mLPADecodeOutput)->isUsedByStrategy(STRATEGY_MEDIA))) {
+        if (mLPADecodeOutput != -1 &&
+            mOutputs.valueFor(mLPADecodeOutput)->isUsedByStrategy(STRATEGY_MEDIA)) {
             LOGV("setOutputDevice: Muting mLPADecodeOutput");
             setStrategyMute(STRATEGY_MEDIA, true, mLPADecodeOutput);
         }
@@ -789,18 +791,17 @@ void AudioPolicyManager::setOutputDevice(audio_io_handle_t output, uint32_t devi
     // update stream volumes according to new device
     AudioPolicyManagerBase::applyStreamVolumes(output, device, delayMs);
 #ifdef WITH_QCOM_LPA
-    if ((mLPADecodeOutput != -1 &&
-        mOutputs.valueFor(mLPADecodeOutput)->isUsedByStrategy(STRATEGY_MEDIA))) {
+    if (mLPADecodeOutput != -1 &&
+        mOutputs.valueFor(mLPADecodeOutput)->isUsedByStrategy(STRATEGY_MEDIA)) {
         AudioPolicyManagerBase::applyStreamVolumes(mLPADecodeOutput, device, delayMs);
     }
 #endif
 #ifdef WITH_A2DP
     // if disconnecting SCO device, restore A2DP output
-    if (AudioSystem::isBluetoothScoDevice((AudioSystem::audio_devices)prevDevice)) {
-         if (mA2dpOutput != 0) {
-             LOGV("restore A2DP output");
-             mpClientInterface->restoreOutput(mA2dpOutput);
-         }
+    if ((AudioSystem::isBluetoothScoDevice((AudioSystem::audio_devices)prevDevice) &&
+        mA2dpOutput != 0)) {
+        LOGV("restore A2DP output");
+        mpClientInterface->restoreOutput(mA2dpOutput);
     }
 #endif
     // if changing from a combined headset + speaker route, unmute media streams
@@ -814,8 +815,8 @@ void AudioPolicyManager::setOutputDevice(audio_io_handle_t output, uint32_t devi
         setStrategyMute(STRATEGY_MEDIA, false, output, delayMs);
 #ifdef WITH_QCOM_LPA
         // Unmute LPA output also if it belongs to STRATEGY_MEDIA
-        if ((mLPADecodeOutput != -1 &&
-            mOutputs.valueFor(mLPADecodeOutput)->isUsedByStrategy(STRATEGY_MEDIA))) {
+        if (mLPADecodeOutput != -1 &&
+            mOutputs.valueFor(mLPADecodeOutput)->isUsedByStrategy(STRATEGY_MEDIA)) {
             LOGV("setOutputDevice: Unmuting mLPADecodeOutput");
             setStrategyMute(STRATEGY_MEDIA, false, mLPADecodeOutput, delayMs);
         }
@@ -1022,43 +1023,43 @@ uint32_t AudioPolicyManager::getDeviceForInputSource(int inputSource)
 {
     uint32_t device;
 
-    switch(inputSource) {
-    case AUDIO_SOURCE_DEFAULT:
-    case AUDIO_SOURCE_MIC:
-    case AUDIO_SOURCE_VOICE_RECOGNITION:
-    case AUDIO_SOURCE_VOICE_COMMUNICATION:
-        if (mForceUse[AudioSystem::FOR_RECORD] == AudioSystem::FORCE_BT_SCO &&
-            mAvailableInputDevices & AudioSystem::DEVICE_IN_BLUETOOTH_SCO_HEADSET) {
-            device = AudioSystem::DEVICE_IN_BLUETOOTH_SCO_HEADSET;
-        } else if (mAvailableInputDevices & AudioSystem::DEVICE_IN_WIRED_HEADSET) {
-            device = AudioSystem::DEVICE_IN_WIRED_HEADSET;
-        } else {
-            device = AudioSystem::DEVICE_IN_BUILTIN_MIC;
-        }
+    switch (inputSource) {
+        case AUDIO_SOURCE_DEFAULT:
+        case AUDIO_SOURCE_MIC:
+        case AUDIO_SOURCE_VOICE_RECOGNITION:
+        case AUDIO_SOURCE_VOICE_COMMUNICATION:
+            if (mForceUse[AudioSystem::FOR_RECORD] == AudioSystem::FORCE_BT_SCO &&
+                mAvailableInputDevices & AudioSystem::DEVICE_IN_BLUETOOTH_SCO_HEADSET) {
+                device = AudioSystem::DEVICE_IN_BLUETOOTH_SCO_HEADSET;
+            } else if (mAvailableInputDevices & AudioSystem::DEVICE_IN_WIRED_HEADSET) {
+                device = AudioSystem::DEVICE_IN_WIRED_HEADSET;
+            } else {
+                device = AudioSystem::DEVICE_IN_BUILTIN_MIC;
+            }
         break;
-    case AUDIO_SOURCE_CAMCORDER:
-        if (hasBackMicrophone()) {
-            device = AudioSystem::DEVICE_IN_BACK_MIC;
-        } else {
-            device = AudioSystem::DEVICE_IN_BUILTIN_MIC;
-        }
+        case AUDIO_SOURCE_CAMCORDER:
+            if (hasBackMicrophone()) {
+                device = AudioSystem::DEVICE_IN_BACK_MIC;
+            } else {
+                device = AudioSystem::DEVICE_IN_BUILTIN_MIC;
+            }
         break;
-    case AUDIO_SOURCE_VOICE_UPLINK:
-    case AUDIO_SOURCE_VOICE_DOWNLINK:
-    case AUDIO_SOURCE_VOICE_CALL:
-        device = AudioSystem::DEVICE_IN_VOICE_CALL;
+        case AUDIO_SOURCE_VOICE_UPLINK:
+        case AUDIO_SOURCE_VOICE_DOWNLINK:
+        case AUDIO_SOURCE_VOICE_CALL:
+            device = AudioSystem::DEVICE_IN_VOICE_CALL;
         break;
 #ifdef HAVE_FM_RADIO
-    case AUDIO_SOURCE_FM_RX:
-        device = AudioSystem::DEVICE_IN_FM_RX;
+        case AUDIO_SOURCE_FM_RX:
+            device = AudioSystem::DEVICE_IN_FM_RX;
         break;
-    case AUDIO_SOURCE_FM_RX_A2DP:
-        device = AudioSystem::DEVICE_IN_FM_RX_A2DP;
+        case AUDIO_SOURCE_FM_RX_A2DP:
+            device = AudioSystem::DEVICE_IN_FM_RX_A2DP;
         break;
 #endif
-    default:
-        LOGW("getInput() invalid input source %d", inputSource);
-        device = 0;
+        default:
+            LOGW("getInput() invalid input source %d", inputSource);
+            device = 0;
         break;
     }
     LOGV("getDeviceForInputSource()input source %d, device %08x", inputSource, device);

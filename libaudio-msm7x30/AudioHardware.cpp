@@ -129,6 +129,7 @@ int (*set_sound_effect)(const char* effect);
 static bool support_tpa2051 = true;
 static bool support_htc_backmic = true;
 static bool isHTCPhone = true;
+static bool fm_enabled = false;
 static int alt_enable = 0;
 static int hac_enable = 0;
 static uint32_t cur_aic_tx = UPLINK_OFF;
@@ -1246,11 +1247,12 @@ status_t do_tpa2051_control(int mode)
     return 0;
 }
 
-static status_t do_route_audio_rpc(uint32_t device,
-                                   bool ear_mute, bool mic_mute,
+static status_t do_route_audio_rpc(uint32_t device, bool ear_mute, bool mic_mute,
                                    uint32_t rx_acdb_id, uint32_t tx_acdb_id) {
-    uint32_t new_rx_device = INVALID_DEVICE, new_tx_device = INVALID_DEVICE;
+    if (device == INVALID_DEVICE)
+        return 0;
 
+    uint32_t new_rx_device = INVALID_DEVICE, new_tx_device = INVALID_DEVICE;
     Routing_table* temp = NULL;
     LOGV("do_route_audio_rpc(%d, %d, %d)", device, ear_mute, mic_mute);
 
@@ -1417,6 +1419,10 @@ static status_t do_route_audio_rpc(uint32_t device,
 status_t AudioHardware::doAudioRouteOrMute(uint32_t device) {
     uint32_t rx_acdb_id = 0;
     uint32_t tx_acdb_id = 0;
+
+    if (!isHTCPhone)
+        return do_route_audio_rpc(device, mMode != AudioSystem::MODE_IN_CALL,
+                                  mMicMute, rx_acdb_id, tx_acdb_id);
 
     if (device == SND_DEVICE_BT) {
         if (!mBluetoothNrec)
@@ -1875,19 +1881,22 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input) {
     status_t ret = NO_ERROR;
     uint32_t sndDevice = INVALID_DEVICE;
 
+    LOGD("doRouting()");
+
     if (input != NULL) {
         uint32_t inputDevice = input->devices();
-        LOGI("do input routing device %x", inputDevice);
+        LOGI("do input routing device 0x%x", inputDevice);
         /* ignore routing device information when we start a recording in voice call
            Recording will happen through currently active tx device */
 #ifdef HAVE_FM_RADIO
-        if ((inputDevice == AudioSystem::DEVICE_IN_VOICE_CALL) ||
-           (inputDevice == AudioSystem::DEVICE_IN_FM_RX) ||
-           (inputDevice == AudioSystem::DEVICE_IN_FM_RX_A2DP))
+        if (inputDevice == AudioSystem::DEVICE_IN_VOICE_CALL ||
+            inputDevice == AudioSystem::DEVICE_IN_FM_RX ||
+            inputDevice == AudioSystem::DEVICE_IN_FM_RX_A2DP)
 #else
         if (inputDevice == AudioSystem::DEVICE_IN_VOICE_CALL)
 #endif
             return NO_ERROR;
+
         if (inputDevice != 0) {
             if (inputDevice & AudioSystem::DEVICE_IN_BLUETOOTH_SCO_HEADSET) {
                 LOGI("Routing audio to Bluetooth PCM");
@@ -1997,7 +2006,7 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input) {
             LOGI("Routing audio to Speakerphone");
             sndDevice = SND_DEVICE_SPEAKER;
 #endif
-        } else if (outputDevices & AudioSystem::DEVICE_OUT_EARPIECE) {
+        } else {
             LOGI("Routing audio to Handset");
             sndDevice = SND_DEVICE_HANDSET;
         }
@@ -2020,7 +2029,7 @@ status_t AudioHardware::doRouting(AudioStreamInMSM72xx *input) {
         disableFM();
 #endif
 
-    if ((sndDevice != INVALID_DEVICE && sndDevice != mCurSndDevice)) {
+    if (sndDevice != INVALID_DEVICE && sndDevice != mCurSndDevice) {
         ret = doAudioRouteOrMute(sndDevice);
         mCurSndDevice = sndDevice;
         if (mMode == AudioSystem::MODE_IN_CALL) {
@@ -2048,10 +2057,15 @@ status_t AudioHardware::enableFM(uint32_t sndDevice) {
         msm_route_stream(PCM_PLAY, 0, DEV_ID(cur_rx), 1);
     }
 
+    fm_enabled = true;
     return NO_ERROR;
 }
 
 status_t AudioHardware::disableFM() {
+    if (!fm_enabled)
+        return NO_ERROR;
+    fm_enabled = false;
+
     LOGD("disableFM");
 
     Routing_table* temp = NULL;
@@ -2198,7 +2212,7 @@ status_t AudioHardware::AudioSessionOutMSM7xxx::setParameters(const String8& key
 
     if (param.getInt(key, device) == NO_ERROR) {
         mDevices = device;
-        LOGV("set output routing %x", mDevices);
+        LOGV("set output routing 0x%x", mDevices);
         status = mHardware->doRouting(NULL);
         param.remove(key);
     }
@@ -2215,7 +2229,7 @@ String8 AudioHardware::AudioSessionOutMSM7xxx::getParameters(const String8& keys
     String8 key = String8(AudioParameter::keyRouting);
 
     if (param.get(key, value) == NO_ERROR) {
-        LOGV("get routing %x", mDevices);
+        LOGV("get routing 0x%x", mDevices);
         param.addInt(key, (int)mDevices);
     }
 
@@ -2479,7 +2493,7 @@ status_t AudioHardware::AudioStreamOutMSM72xx::setParameters(const String8& keyV
 
     if (param.getInt(key, device) == NO_ERROR) {
         mDevices = device;
-        LOGV("set output routing %x", mDevices);
+        LOGV("set output routing 0x%x", mDevices);
         status = mHardware->doRouting(NULL);
         param.remove(key);
     }
@@ -2496,7 +2510,7 @@ String8 AudioHardware::AudioStreamOutMSM72xx::getParameters(const String8& keys)
     String8 key = String8(AudioParameter::keyRouting);
 
     if (param.get(key, value) == NO_ERROR) {
-        LOGV("get routing %x", mDevices);
+        LOGV("get routing 0x%x", mDevices);
         param.addInt(key, (int)mDevices);
     }
 
@@ -2508,7 +2522,6 @@ status_t AudioHardware::AudioStreamOutMSM72xx::getRenderPosition(uint32_t *dspFr
     /* TODO: enable when supported by driver */
     return INVALID_OPERATION;
 }
-
 
 // ----------------------------------------------------------------------------
 
@@ -2525,9 +2538,9 @@ status_t AudioHardware::AudioStreamInMSM72xx::set(
     if ((pFormat == 0) ||
        ((*pFormat != AUDIO_HW_IN_FORMAT) &&
 #ifdef WITH_QCOM_SPEECH
-         (*pFormat != AudioSystem::AMR_NB) &&
-         (*pFormat != AudioSystem::EVRC) &&
-         (*pFormat != AudioSystem::QCELP) &&
+        (*pFormat != AudioSystem::AMR_NB) &&
+        (*pFormat != AudioSystem::EVRC) &&
+        (*pFormat != AudioSystem::QCELP) &&
 #endif
          (*pFormat != AudioSystem::AAC)))     {
         *pFormat = AUDIO_HW_IN_FORMAT;
@@ -2560,7 +2573,7 @@ status_t AudioHardware::AudioStreamInMSM72xx::set(
         LOGE("Audio record already open");
         return -EPERM;
     }
-    status_t status =0;
+    status_t status = 0;
     struct msm_voicerec_mode voc_rec_cfg;
 #ifdef HAVE_FM_RADIO
     if (devices == AudioSystem::DEVICE_IN_FM_RX_A2DP) {
@@ -3005,7 +3018,7 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes) 
 */
             hw->mLock.unlock();
         } else {
-#else
+#endif
             hw->mLock.unlock();
             if (ioctl(mFd, AUDIO_GET_SESSION_ID, &dec_id)) {
                 LOGE("AUDIO_GET_SESSION_ID failed*********");
@@ -3032,7 +3045,6 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes) 
             }
             addToTable(dec_id,cur_tx, INVALID_DEVICE, PCM_REC, true);
             mFirstread = false;
-#endif
 #ifdef HAVE_FM_RADIO
         }
 #endif
@@ -3179,7 +3191,7 @@ ssize_t AudioHardware::AudioStreamInMSM72xx::read( void* buffer, ssize_t bytes) 
     if (mFormat == AudioSystem::AAC)
         return aac_framesize;
 
-        return bytes;
+    return bytes;
 }
 
 status_t AudioHardware::AudioStreamInMSM72xx::standby() {
@@ -3187,17 +3199,15 @@ status_t AudioHardware::AudioStreamInMSM72xx::standby() {
     LOGD("AudioStreamInMSM72xx::standby()");
     Routing_table* temp = NULL;
 
-    if (mHardware) {
-        mHardware->set_mRecordState(false);
-        if (support_aic3254) {
-            int snd_dev = mHardware->get_snd_dev();
-            mHardware->aic3254_config(snd_dev);
-            mHardware->do_aic3254_control(snd_dev);
-        }
-    }
-
     if (!mHardware)
-          return -1;
+        return -1;
+
+    mHardware->set_mRecordState(false);
+    if (support_aic3254) {
+        int snd_dev = mHardware->get_snd_dev();
+        mHardware->aic3254_config(snd_dev);
+        mHardware->do_aic3254_control(snd_dev);
+    }
 
     if (mState > AUDIO_INPUT_CLOSED) {
         if (mFd >= 0) {
@@ -3267,7 +3277,7 @@ status_t AudioHardware::AudioStreamInMSM72xx::setParameters(const String8& keyVa
 
     key = String8(AudioParameter::keyRouting);
     if (param.getInt(key, device) == NO_ERROR) {
-        LOGV("set input routing %x", device);
+        LOGV("set input routing 0x%x", device);
         if (device & (device - 1))
             status = BAD_VALUE;
         else {
@@ -3289,7 +3299,7 @@ String8 AudioHardware::AudioStreamInMSM72xx::getParameters(const String8& keys) 
     String8 key = String8(AudioParameter::keyRouting);
 
     if (param.get(key, value) == NO_ERROR) {
-        LOGV("get routing %x", mDevices);
+        LOGV("get routing 0x%x", mDevices);
         param.addInt(key, (int)mDevices);
     }
 
