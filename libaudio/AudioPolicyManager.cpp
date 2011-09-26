@@ -141,7 +141,17 @@ uint32_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strategy, boo
         // FALL THROUGH
 
     case STRATEGY_MEDIA: {
+#ifdef HAVE_FM_RADIO
+        uint32_t device2 = 0;
+        if (mForceUse[AudioSystem::FOR_MEDIA] == AudioSystem::FORCE_SPEAKER) {
+            device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_SPEAKER;
+        }
+        if (device2 == 0) {
+            device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_AUX_DIGITAL;
+        }
+#else
         uint32_t device2 = mAvailableOutputDevices & AudioSystem::DEVICE_OUT_AUX_DIGITAL;
+#endif
 #ifdef WITH_A2DP
         if (mA2dpOutput != 0) {
             if (strategy == STRATEGY_SONIFICATION && !a2dpUsedForSonification()) {
@@ -173,6 +183,13 @@ uint32_t AudioPolicyManager::getDeviceForStrategy(routing_strategy strategy, boo
 
         // device is DEVICE_OUT_SPEAKER if we come from case STRATEGY_SONIFICATION, 0 otherwise
         device |= device2;
+
+#ifdef HAVE_FM_RADIO
+        if (mAvailableOutputDevices & AudioSystem::DEVICE_OUT_FM_ALL) {
+                device |= AudioSystem::DEVICE_OUT_FM_ALL;
+        }
+#endif
+
         // Do not play media stream if in call and the requested device would change the hardware
         // output routing
         if (isInCall() &&
