@@ -142,6 +142,7 @@ const char ** name = NULL;
 int mixer_cnt = 0;
 static uint32_t cur_tx = INVALID_DEVICE;
 static uint32_t cur_rx = INVALID_DEVICE;
+bool vMicMute = false;
 
 typedef struct routing_table {
     unsigned short dec_id;
@@ -343,6 +344,7 @@ static status_t updateDeviceInfo(uint32_t rx_device, uint32_t tx_device,
     LOGD("updateDeviceInfo: E rx_device %d and tx_device %d", rx_device, tx_device);
     bool isRxDeviceEnabled = false, isTxDeviceEnabled = false;
     Routing_table *temp_ptr, *temp_head;
+    int tx_dev_prev = INVALID_DEVICE;
     temp_head = head;
 
     Mutex::Autolock lock(mDeviceSwitchLock);
@@ -412,8 +414,15 @@ static status_t updateDeviceInfo(uint32_t rx_device, uint32_t tx_device,
                     LOGE("msm_route_stream(PCM_REC, %d, %d, 1) failed", temp_ptr->dec_id, DEV_ID(tx_device));
                 }
                 modifyActiveDeviceOfStream(PCM_REC, tx_device, INVALID_DEVICE);
+                tx_dev_prev = cur_tx;
                 cur_tx = tx_device;
                 cur_rx = rx_device;
+#ifdef WITH_QCOM_VOIPMUTE
+                if ((vMicMute == true) && (tx_dev_prev != cur_tx)) {
+                    LOGD("REC:device switch with mute enabled :tx_dev_prev %d cur_tx: %d", tx_dev_prev, cur_tx);
+                    msm_device_mute(DEV_ID(cur_tx), true);
+                }
+#endif
                 break;
             case VOICE_CALL:
                 LOGD("case VOICE_CALL");
@@ -507,6 +516,11 @@ AudioHardware::AudioHardware() :
     control = msm_mixer_open("/dev/snd/controlC0", 0);
     if (control < 0)
         LOGE("ERROR opening the device");
+
+#ifdef WITH_QCOM_RESETALL
+    if (msm_reset_all_device() < 0)
+        LOGE("msm_reset_all_device() failed");
+#endif
 
     mixer_cnt = msm_mixer_count();
     LOGD("msm_mixer_count:mixer_cnt = %d", mixer_cnt);
@@ -847,7 +861,18 @@ status_t AudioHardware::setMicMute_nosync(bool state) {
     if (mMicMute != state) {
         mMicMute = state;
         LOGD("setMicMute_nosync calling voice mute with the mMicMute %d", mMicMute);
-        msm_set_voice_tx_mute(mMicMute);
+#ifdef WITH_QCOM_VOIPMUTE
+        if (isStreamOnAndActive(PCM_REC) && (mMode == AudioSystem::MODE_IN_COMMUNICATION)) {
+            vMicMute = state;
+            LOGD("VOIP Active: vMicMute %d", vMicMute);
+            msm_device_mute(DEV_ID(cur_tx), vMicMute);
+        } else {
+#endif
+            LOGD("setMicMute_nosync:voice_mute");
+            msm_set_voice_tx_mute(mMicMute);
+#ifdef WITH_QCOM_VOIPMUTE
+        }
+#endif
     }
     return NO_ERROR;
 }
