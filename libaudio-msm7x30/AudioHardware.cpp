@@ -1705,6 +1705,7 @@ status_t AudioHardware::do_aic3254_control(uint32_t device) {
             switch (device) {
                 case SND_DEVICE_HEADSET:
                     new_aic_txmode = VOICERECORD_EMIC;
+                    break;
                 case SND_DEVICE_HANDSET_BACK_MIC:
                 case SND_DEVICE_SPEAKER_BACK_MIC:
                 case SND_DEVICE_NO_MIC_HEADSET_BACK_MIC:
