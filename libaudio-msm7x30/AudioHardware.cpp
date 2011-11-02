@@ -672,11 +672,11 @@ AudioHardware::AudioHardware() :
     support_back_mic = (int (*)(void))::dlsym(acoustic, "support_back_mic");
     if ((*support_back_mic) == 0 ) {
         LOGI("support_back_mic() not present");
-            support_htc_backmic = false;
+        support_htc_backmic = false;
     }
 
     if (support_htc_backmic) {
-        if (support_back_mic() < 0) {
+        if (support_back_mic() != 1) {
             LOGI("HTC DualMic is not supported");
             support_htc_backmic = false;
         }
